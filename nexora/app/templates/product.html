@@ -1,0 +1,3 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Nexora Product</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><nav><div class="logo">nexora<b>.</b></div><a href="/">Home</a><a href="/solutions">Solutions</a><a href="/login">Customer Portal</a></nav>
+<main class="wrap">{% if product %}<span class="tag">{{product['category']}}</span><h1>{{product['name']}}</h1><p class="lead">Enterprise product supplied by Nexora Technologies.</p><h2>₹{{"{:,}".format(product['price'])}}</h2><a class="btn" href="/solutions">Back to solutions</a>{% else %}<h1>Product not found</h1>{% endif %}</main></body></html>

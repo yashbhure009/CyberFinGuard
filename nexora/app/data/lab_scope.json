@@ -1,0 +1,156 @@
+{
+  "environment": "Nexora fictional company - controlled vulnerability lab",
+  "scope_rule": "ONLY the 30 shortlisted CVEs are in scope",
+  "cves": [
+    {
+      "cve_id": "CVE-2024-27198",
+      "technology": "TeamCity",
+      "component": "DevOps / CI Server"
+    },
+    {
+      "cve_id": "CVE-2021-26855",
+      "technology": "Microsoft Exchange",
+      "component": "Email Server"
+    },
+    {
+      "cve_id": "CVE-2021-34473",
+      "technology": "Microsoft Exchange",
+      "component": "Email Server"
+    },
+    {
+      "cve_id": "CVE-2021-27065",
+      "technology": "Microsoft Exchange",
+      "component": "Email Server"
+    },
+    {
+      "cve_id": "CVE-2019-0604",
+      "technology": "Microsoft SharePoint",
+      "component": "Collaboration Server"
+    },
+    {
+      "cve_id": "CVE-2021-22893",
+      "technology": "Pulse Connect Secure",
+      "component": "VPN Gateway"
+    },
+    {
+      "cve_id": "CVE-2018-0296",
+      "technology": "Cisco ASA",
+      "component": "Network Firewall"
+    },
+    {
+      "cve_id": "CVE-2024-37079",
+      "technology": "VMware vCenter",
+      "component": "Virtualization Server"
+    },
+    {
+      "cve_id": "CVE-2025-14847",
+      "technology": "MongoDB",
+      "component": "Customer Database"
+    },
+    {
+      "cve_id": "CVE-2023-27532",
+      "technology": "Veeam Backup & Replication",
+      "component": "Backup Server"
+    },
+    {
+      "cve_id": "CVE-2018-16763",
+      "technology": "Fuel CMS",
+      "component": "Public Web/CMS"
+    },
+    {
+      "cve_id": "CVE-2019-9053",
+      "technology": "CMS Made Simple",
+      "component": "Public Web/CMS"
+    },
+    {
+      "cve_id": "CVE-2025-64459",
+      "technology": "Django",
+      "component": "Application Server"
+    },
+    {
+      "cve_id": "CVE-2017-1000499",
+      "technology": "phpMyAdmin",
+      "component": "Database Admin"
+    },
+    {
+      "cve_id": "CVE-2024-21514",
+      "technology": "OpenCart",
+      "component": "E-commerce"
+    },
+    {
+      "cve_id": "CVE-2015-1398",
+      "technology": "Magento",
+      "component": "E-commerce"
+    },
+    {
+      "cve_id": "CVE-2020-15867",
+      "technology": "Gogs",
+      "component": "Git Server"
+    },
+    {
+      "cve_id": "CVE-2021-41303",
+      "technology": "Apache Shiro",
+      "component": "Application Authentication"
+    },
+    {
+      "cve_id": "CVE-2023-43622",
+      "technology": "Apache HTTP Server",
+      "component": "Public Web Server"
+    },
+    {
+      "cve_id": "CVE-2025-1098",
+      "technology": "ingress-nginx",
+      "component": "Kubernetes Ingress"
+    },
+    {
+      "cve_id": "CVE-2019-1215",
+      "technology": "Microsoft Windows",
+      "component": "Windows Server"
+    },
+    {
+      "cve_id": "CVE-2024-21345",
+      "technology": "Windows Server",
+      "component": "Windows Server"
+    },
+    {
+      "cve_id": "CVE-2021-26411",
+      "technology": "Internet Explorer/Windows",
+      "component": "Employee Workstation"
+    },
+    {
+      "cve_id": "CVE-2023-44466",
+      "technology": "Linux kernel",
+      "component": "Linux Server"
+    },
+    {
+      "cve_id": "CVE-2021-32675",
+      "technology": "Redis",
+      "component": "Cache Server"
+    },
+    {
+      "cve_id": "CVE-2020-27751",
+      "technology": "ImageMagick",
+      "component": "File Processing"
+    },
+    {
+      "cve_id": "CVE-2023-28341",
+      "technology": "ManageEngine Applications Manager",
+      "component": "Monitoring"
+    },
+    {
+      "cve_id": "CVE-2021-26929",
+      "technology": "Horde Webmail",
+      "component": "Webmail"
+    },
+    {
+      "cve_id": "CVE-2020-25706",
+      "technology": "Cacti",
+      "component": "Monitoring"
+    },
+    {
+      "cve_id": "CVE-2023-0830",
+      "technology": "EasyNAS",
+      "component": "Storage"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Nexora Admin</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><nav><div class="logo">nexora<b>.</b></div><a href="/">Public Site</a><a href="/admin">Admin</a></nav>
+<main class="wrap"><span class="tag">INTERNAL ADMIN PORTAL</span><h1>Customer administration</h1><div class="notice">This internal surface is intentionally part of the controlled security-assessment lab.</div>
+<table><tr><th>ID</th><th>Email</th><th>Role</th></tr>{% for u in users %}<tr><td>{{u.id}}</td><td>{{u.email}}</td><td>{{u.role}}</td></tr>{% endfor %}</table></main></body></html>

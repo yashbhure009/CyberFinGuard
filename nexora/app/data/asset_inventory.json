@@ -1,0 +1,121 @@
+[
+  {
+    "asset_id": "WEB-01",
+    "name": "Public Web & CMS",
+    "address": "127.0.0.1:8200",
+    "technologies": [
+      "Apache HTTP Server",
+      "Fuel CMS",
+      "CMS Made Simple"
+    ]
+  },
+  {
+    "asset_id": "SHOP-01",
+    "name": "E-commerce",
+    "address": "127.0.0.1:8200/solutions",
+    "technologies": [
+      "Magento",
+      "OpenCart"
+    ]
+  },
+  {
+    "asset_id": "APP-01",
+    "name": "Application/API",
+    "address": "127.0.0.1:8200/api",
+    "technologies": [
+      "Django",
+      "Apache Shiro",
+      "Redis"
+    ]
+  },
+  {
+    "asset_id": "DB-01",
+    "name": "Customer Data",
+    "address": "127.0.0.1:8200/api/profile",
+    "technologies": [
+      "MongoDB",
+      "phpMyAdmin"
+    ]
+  },
+  {
+    "asset_id": "WIN-01",
+    "name": "Windows Server",
+    "address": "synthetic internal asset",
+    "technologies": [
+      "Microsoft Windows",
+      "Windows Server"
+    ]
+  },
+  {
+    "asset_id": "MAIL-01",
+    "name": "Email & Collaboration",
+    "address": "synthetic internal asset",
+    "technologies": [
+      "Microsoft Exchange",
+      "Microsoft SharePoint",
+      "Horde Webmail"
+    ]
+  },
+  {
+    "asset_id": "DEV-01",
+    "name": "DevOps",
+    "address": "synthetic internal asset",
+    "technologies": [
+      "TeamCity",
+      "Gogs"
+    ]
+  },
+  {
+    "asset_id": "NET-01",
+    "name": "Perimeter",
+    "address": "synthetic internal asset",
+    "technologies": [
+      "Pulse Connect Secure",
+      "Cisco ASA"
+    ]
+  },
+  {
+    "asset_id": "INFRA-01",
+    "name": "Infrastructure",
+    "address": "synthetic internal asset",
+    "technologies": [
+      "VMware vCenter",
+      "ingress-nginx"
+    ]
+  },
+  {
+    "asset_id": "BACKUP-01",
+    "name": "Backup & Storage",
+    "address": "synthetic internal asset",
+    "technologies": [
+      "Veeam Backup & Replication",
+      "EasyNAS"
+    ]
+  },
+  {
+    "asset_id": "MON-01",
+    "name": "Monitoring",
+    "address": "synthetic internal asset",
+    "technologies": [
+      "Cacti",
+      "ManageEngine Applications Manager"
+    ]
+  },
+  {
+    "asset_id": "FILE-01",
+    "name": "File Processing / Linux",
+    "address": "127.0.0.1:8200/uploads",
+    "technologies": [
+      "ImageMagick",
+      "Linux kernel"
+    ]
+  },
+  {
+    "asset_id": "USR-01",
+    "name": "Employee Workstation",
+    "address": "synthetic internal asset",
+    "technologies": [
+      "Internet Explorer/Windows"
+    ]
+  }
+]

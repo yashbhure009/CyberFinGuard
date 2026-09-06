@@ -1,0 +1,19 @@
+
+:root{--ink:#132033;--muted:#617087;--blue:#2563eb;--bg:#f5f7fb;--line:#e1e6ee}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px Inter,Segoe UI,Arial,sans-serif}
+nav{height:68px;background:white;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 7%;gap:30px}
+.logo{font-size:22px;font-weight:800;margin-right:auto}.logo b{color:var(--blue)}
+nav a{text-decoration:none;color:var(--muted)}nav a:hover{color:var(--blue)}
+.wrap{max-width:1120px;margin:auto;padding:55px 24px}.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:50px;align-items:center;padding-top:60px}
+h1{font-size:52px;line-height:1.05;letter-spacing:-2px;margin:0 0 20px}.lead{font-size:19px;line-height:1.65;color:var(--muted)}
+.btn{display:inline-block;background:var(--blue);color:white;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;margin-top:12px}
+.visual{background:#101b2d;color:#dce7fb;padding:28px;border-radius:16px}.row{display:flex;justify-content:space-between;border-bottom:1px solid #ffffff18;padding:15px 0}.row:last-child{border:0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.products{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px}.card h3{margin-top:8px}.muted{color:var(--muted)}
+.tag{display:inline-block;padding:5px 9px;border-radius:99px;background:#eaf0ff;color:#2355b4;font-size:12px;font-weight:700}
+form{max-width:460px;background:white;border:1px solid var(--line);padding:25px;border-radius:12px}label{display:block;margin-top:14px;font-weight:700}
+input{width:100%;padding:11px;border:1px solid #ccd4df;border-radius:7px;margin-top:7px}button{border:0;cursor:pointer}
+.notice{background:#fff4df;border:1px solid #f0d59d;padding:15px;border-radius:9px;margin:20px 0}
+table{width:100%;border-collapse:collapse;background:#fff}th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line)}
+footer{background:#101b2d;color:#b9c4d4;padding:25px 7%;margin-top:60px;font-size:13px}
+@media(max-width:800px){.hero,.grid,.products{grid-template-columns:1fr}h1{font-size:40px}}

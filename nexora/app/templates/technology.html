@@ -1,0 +1,7 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Nexora Technology Estate</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><nav><div class="logo">nexora<b>.</b></div><a href="/">Home</a><a href="/solutions">Solutions</a><a href="/login">Customer Portal</a><a href="/about">Company</a><a href="/technology">Technology</a></nav>
+<main class="wrap"><span class="tag">NEXORA TECHNOLOGY ESTATE</span><h1>Our technology environment</h1>
+<p class="lead">Nexora operates a multi-tier enterprise environment spanning web, commerce, applications, data, identity, collaboration, infrastructure and operations.</p>
+<div class="grid">
+{% for a in assets %}<div class="card"><span class="tag">{{a['asset_id']}}</span><h3>{{a['name']}}</h3><p class="muted">{{a['address']}}</p><p><b>Technology:</b><br>{{", ".join(a['technologies'])}}</p></div>{% endfor %}
+</div></main><footer>Nexora Technologies · Controlled synthetic enterprise environment</footer></body></html>

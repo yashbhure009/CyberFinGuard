@@ -1,0 +1,10 @@
+services:
+  nexora-web:
+    build: ./app
+    ports:
+      - "8200:8200"
+    environment:
+      - NEXORA_ENV=synthetic-vulnerable-lab
+# Additional enterprise assets are represented in app/data/asset_inventory.json.
+# For the SIH deployment, replace each synthetic internal asset with an isolated,
+# version-pinned lab container/VM image approved for your test environment.
