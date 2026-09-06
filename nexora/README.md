@@ -1,7 +1,5 @@
 # Nexora — Vulnerable Fictional Company Website
 
-**This bundle contains ONLY the fictional Nexora company environment.**
-CyberFinGuard is deliberately NOT included.
 
 ## Purpose
 
