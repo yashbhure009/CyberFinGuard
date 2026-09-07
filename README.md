@@ -24,28 +24,36 @@ A platform that answers one critical question for leadership:
 │ DATA SOURCES │
 │ Wazuh │ OpenVAS │ Prowler │ Keycloak │ CISA KEV │ EPSS │
 └─────────────────────────────────────────────────────────────────────┘
+
 │
 ▼
+
 ┌─────────────────────────────────────────────────────────────────────┐
 │ DATA INGESTION LAYER │
 │ Pollers → Normalize → Store in PostgreSQL │
 └─────────────────────────────────────────────────────────────────────┘
+
 │
 ▼
+
 ┌─────────────────────────────────────────────────────────────────────┐
 │ RISK SCORING ENGINE │
 │ SLE = Asset_Value × (CVSS/10) │
 │ ARO = Base_Likelihood × Threat_Multiplier × Control_Multiplier │
 │ ALE = SLE × ARO │
 └─────────────────────────────────────────────────────────────────────┘
+
 │
 ▼
+
 ┌─────────────────────────────────────────────────────────────────────┐
 │ AI & OPTIMIZATION LAYER │
 │ ML Model (Likelihood Prediction) + Knapsack Optimizer │
 └─────────────────────────────────────────────────────────────────────┘
+
 │
 ▼
+
 ┌─────────────────────────────────────────────────────────────────────┐
 │ DASHBOARD (React/Next.js) │
 │ Executive View │ Technical View │ Investment Optimizer │
