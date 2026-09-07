@@ -1,0 +1,49 @@
+
+---
+
+## 📄 **File 2: `requirements.txt`**
+
+Create `D:\PROJECT\CyberFinGuard\requirements.txt`
+
+```txt
+# ============================================================
+# CyberFinGuard - Python Dependencies
+# ============================================================
+
+# Database
+psycopg2-binary==2.9.9
+
+# HTTP Requests & APIs
+requests==2.31.0
+urllib3==2.1.0
+
+# Environment & Configuration
+python-dotenv==1.0.0
+
+# Data Validation
+pydantic==2.5.0
+pydantic-core==2.14.5
+typing-extensions==4.8.0
+
+# Web Framework (for API layer - coming soon)
+fastapi==0.104.1
+uvicorn==0.24.0
+starlette==0.27.0
+
+# Data Processing (for ML - coming soon)
+pandas==2.1.3
+numpy==1.26.2
+scikit-learn==1.3.2
+
+# Optional - for OpenVAS integration
+python-gvm==23.11.0
+
+# Optional - for better logging
+colorlog==6.7.0
+
+# ============================================================
+# Notes:
+# 1. Use 'pip install -r requirements.txt' to install all
+# 2. Python 3.8+ required
+# 3. For WSL/Windows, some packages may need additional setup
+# ============================================================
