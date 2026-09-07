@@ -56,29 +56,29 @@ A platform that answers one critical question for leadership:
 
 ## 🚀 Quick Start (5 Minutes Setup)
 
-### 1️⃣ Clone the Repository
+### Clone the Repository
 
-```bash
 git clone https://github.com/yashbhure009/CyberFinGuard.git
 cd CyberFinGuard
-Install Python Dependencies
-bash
+
+### Install Python Dependencies
+
 pip install -r requirements.txt
-Start PostgreSQL with Docker
-bash
+### Start PostgreSQL with Docker
+
 docker run -d --name postgres-risk \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=cyber_risk_db \
   -p 5432:5432 \
   postgres:15
-Setup Database
-bash
+### Setup Database
+
 python setup_db.py
-Run Data Ingestion
-bash
+### Run Data Ingestion
+
 python main.py
-Verify Database
-bash
+### Verify Database
+
 python -c "from backend.database import db; print(db.execute_query('SELECT COUNT(*) FROM assets'))"
 
 
