@@ -1,1 +1,24 @@
-.env 
+# Environment files (never commit!)
+.env
+.env.local
+.env.*.local
+
+# But DO commit the template
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# VS Code
+.vscode/settings.json
+
+# Data
+data/*.json
+!data/sample_findings.json
+
+# Logs
+*.log

@@ -23,9 +23,9 @@ class Database:
                 port=os.getenv('DB_PORT', '5432')
             )
             self.conn.autocommit = False
-            logger.info("✅ Database connected")
+            logger.info(" Database connected")
         except Exception as e:
-            logger.error(f"❌ Database connection failed: {e}")
+            logger.error(f" Database connection failed: {e}")
             raise
     
     def execute_query(self, query, params=None):
