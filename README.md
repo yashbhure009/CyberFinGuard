@@ -412,5 +412,3 @@ git push origin main
 ```
 
 ---
-
-**Output paste karo — main verify karunga!** 🚀
