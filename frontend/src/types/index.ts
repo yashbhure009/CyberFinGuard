@@ -25,11 +25,15 @@ export interface WebsiteTarget {
   endpointsAnalyzed?: number;
   findingsDiscovered?: number;
   lastScannedAt?: string;
+  assetId?: string;
+  unmappedFields?: string[];
 }
 
 export interface NetworkTarget {
   ipAddress: string;
   port: number;
+  assetId?: string;
+  unmappedFields?: string[];
 }
 
 export type CloudProvider = "AWS" | "Azure" | "GCP";
@@ -38,6 +42,8 @@ export interface CloudIntegration {
   provider: CloudProvider;
   fields: Record<string, string>;
   status: "configured" | "pending";
+  assetId?: string;
+  unmappedFields?: string[];
 }
 
 export interface IAMIntegration {
@@ -45,6 +51,9 @@ export interface IAMIntegration {
   realm: string;
   clientId: string;
   status: "configured" | "pending";
+  clientSecret?: string;
+  assetId?: string;
+  unmappedFields?: string[];
 }
 
 export interface BusinessContext {
@@ -61,6 +70,8 @@ export interface BusinessContext {
   recoveryCost: number;
   revenueDependency: number;
   assetCriticality: number;
+  assetId?: string;
+  unmappedFields?: string[];
 }
 
 export interface AssessmentProgress {
