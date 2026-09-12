@@ -1,14 +1,10 @@
-## 🚀 **GitHub Push Karo — README Update Ke Saath**
-
-Chal step-by-step karte hain. Pehle README update, phir push.
+## 🚀 **GitHub — README**
 
 ---
 
-## 📝 **Step 1: README.md Update Karo**
+## 📝 **Step 1: README.md**
 
 **File:** `D:\PROJECT\CyberFinGuard\CyberFinGuard\README.md`
-
-VS Code mein kholo aur ye **complete content** paste karo:
 
 ```markdown
 # 🛡️ CyberFinGuard - AI-Powered Cyber Risk Quantification Platform
@@ -338,7 +334,7 @@ git push origin main
 
 ---
 
-## ⚠️ **Step 3: `.env` Verify Karo — GitHub Pe Nahi Jaana Chahiye**
+## ⚠️ **Step 3: `.env` Verify Not To Be Uploaded On Github**
 
 ```powershell
 # .gitignore check karo
@@ -351,7 +347,7 @@ type .gitignore | findstr ".env"
 !.env.example
 ```
 
-**Agar `.env` tracked hai toh:**
+**If `.env` is Pushed:**
 ```powershell
 git rm --cached .env
 git commit -m "Removed .env from tracking"
@@ -359,9 +355,9 @@ git commit -m "Removed .env from tracking"
 
 ---
 
-## 📋 **Step 4: Verify Karo GitHub Pe**
+## 📋 **Step 4: Verify on GitHub **
 
-Push ke baad ye URL kholo:
+After Push Verify GitHub:
 **https://github.com/yashbhure009/CyberFinGuard**
 
 Check karo:
@@ -396,7 +392,7 @@ To https://github.com/yashbhure009/CyberFinGuard
 
 ---
 
-## 🚀 **Ab Yeh Karo**
+## 🚀 **Now Do This**
 
 ```powershell
 cd D:\PROJECT\CyberFinGuard\CyberFinGuard
