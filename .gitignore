@@ -22,3 +22,7 @@ data/*.json
 
 # Logs
 *.log
+
+# Next.js / Node
+node_modules/
+.next/
