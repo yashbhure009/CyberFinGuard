@@ -1,0 +1,21 @@
+{
+  "total_findings": 282,
+  "by_severity": {
+    "medium": 128,
+    "high": 112,
+    "low": 35,
+    "info": 4,
+    "critical": 3
+  },
+  "by_source": {
+    "zap": 273,
+    "nmap": 4,
+    "openvas": 3,
+    "wazuh": 1,
+    "prowler": 1
+  },
+  "total_cves": "3",
+  "kev_count": 0,
+  "avg_cvss": 5.866666666666667,
+  "avg_epss": 0.0207
+}
