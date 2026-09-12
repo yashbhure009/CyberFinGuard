@@ -41,6 +41,10 @@ python-gvm==23.11.0
 # Optional - for better logging
 colorlog==6.7.0
 
+# Tests
+httpx==0.25.2
+pytest==7.4.3
+
 # ============================================================
 # Notes:
 # 1. Use 'pip install -r requirements.txt' to install all
