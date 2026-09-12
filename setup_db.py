@@ -6,15 +6,18 @@ Run this file once to set up the entire database
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import os
+from dotenv import load_dotenv
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
-DB_HOST = 'localhost'
-DB_NAME = 'cyber_risk_db'
-DB_USER = 'postgres'
-DB_PASSWORD = 'postgres'
-DB_PORT = '5432'
+load_dotenv()
+
+DB_HOST = os.environ['DB_HOST']
+DB_NAME = os.environ['DB_NAME']
+DB_USER = os.environ['DB_USER']
+DB_PASSWORD = os.environ['DB_PASSWORD']
+DB_PORT = os.getenv('DB_PORT', '5432')
 
 # ============================================================
 # SQL SCHEMA
