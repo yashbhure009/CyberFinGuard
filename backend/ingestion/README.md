@@ -115,9 +115,122 @@ Security Tools
   PostgreSQL
       ↓
 Risk Engine / AI Layer
+
+### Wazuh
+
+Wazuh is used to collect endpoint and security telemetry.
+
+- Runs using WSL and Docker Desktop
+- Monitors registered endpoints through Wazuh agents
+- Collects security alerts
+- Extracts MITRE ATT&CK techniques
+- Normalizes alerts into CyberFinGuard findings
+- Stores alerts and endpoint assets in PostgreSQL
+
+Wazuh is currently deployed using the Wazuh Docker single-node setup.
+
+### Wazuh Setup
+
+1. Start Docker Desktop
+
+Make sure Docker Desktop is running and WSL integration is enabled.
+
+2. Verify Wazuh containers
+
+From WSL:
+
+```bash
+docker ps
+
+The following Wazuh containers should be running:
+
+Wazuh Manager
+Wazuh Indexer
+Wazuh Dashboard
+Verify Wazuh API
+curl -k https://localhost:55000
+
+The API should respond and require authentication.
+
+Configure Wazuh environment variables
+
+Add the following to the CyberFinGuard .env file:
+
+WAZUH_API_URL=https://localhost:55000
+WAZUH_USERNAME=<wazuh-api-username>
+WAZUH_PASSWORD=<wazuh-api-password>
+
+WAZUH_INDEXER_URL=https://localhost:9200
+WAZUH_INDEXER_USER=<indexer-username>
+WAZUH_INDEXER_PASSWORD=<indexer-password>
+
+Do not commit the .env file or any credentials to GitHub.
+
+Wazuh Execution
+
+From the CyberFinGuard project directory on Windows:
+
+python -u backend\ingestion\wazuh_ingestor.py
+
+The Wazuh ingestor:
+
+Authenticates with the Wazuh API.
+Retrieves registered Wazuh agents.
+Synchronizes agents as assets in PostgreSQL.
+Retrieves Wazuh security alerts from the Indexer.
+Extracts severity and MITRE ATT&CK techniques.
+Normalizes alerts into CyberFinGuard findings.
+Stores the findings in PostgreSQL.
+
+Example output:
+
+Database connected
+agents HTTP status: 200
+agents count: 2
+MITRE techniques found: XX
+Done: X new assets, XX alerts
+Database Tables
+
+Wazuh uses the existing CyberFinGuard tables:
+
+assets
+findings
+
+Wazuh agents are stored as assets, while Wazuh alerts are stored as security findings.
+
+Wazuh Role in CyberFinGuard
+
+Wazuh provides endpoint and security telemetry and complements the other ingestion sources:
+
+Source	Purpose
+Prowler	AWS/cloud security
+Keycloak	IAM, users, roles, groups and MFA
+Wazuh	Endpoint and security telemetry
+ZAP	Web application security
+OpenVAS	Vulnerability scanning
+
+The collected data is stored in PostgreSQL and can subsequently be used by the CyberFinGuard risk engine for risk analysis and quantification.
+
+
+Then replace your existing **Current Status** with:
+
+```markdown
+## Data Flow
+
+```text
+Security Tools
+      ↓
+   Ingestion
+      ↓
+ Normalization
+      ↓
+  PostgreSQL
+      ↓
+Risk Engine / AI Layer
 Current Status
+
 Prowler – Integrated
 Keycloak – Integrated
+Wazuh – Integrated
 OpenVAS – To be integrated
-Wazuh – To be integrated
-ZAP – To be integrated
+ZAP – Integrated
