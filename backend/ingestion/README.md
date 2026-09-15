@@ -27,11 +27,26 @@ Keycloak provides IAM and authentication information.
 
 Keycloak data is normalized and stored in PostgreSQL.
 
+### Wazuh
+
+Wazuh is used to collect endpoint and security telemetry.
+
+- Runs using WSL and Docker Desktop
+- Monitors registered endpoints through Wazuh agents
+- Collects security alerts
+- Extracts MITRE ATT&CK techniques
+- Normalizes alerts into CyberFinGuard findings
+- Stores alerts and endpoint assets in PostgreSQL
+
+Wazuh is currently deployed using the Wazuh Docker single-node setup.
+
 ---
 
 ## Setup
 
 Kali Linux is currently used as the security-tool environment for Prowler and Keycloak.
+
+Wazuh is deployed separately using WSL and Docker Desktop.
 
 Configure SSH access from the CyberFinGuard backend to Kali.
 
@@ -47,22 +62,33 @@ KEYCLOAK_URL=http://127.0.0.1:8080
 KEYCLOAK_ADMIN=<keycloak-admin>
 KEYCLOAK_PASSWORD=<keycloak-password>
 KEYCLOAK_REALM=cyberfinguard
+
+WAZUH_API_URL=https://localhost:55000
+WAZUH_USERNAME=<wazuh-api-username>
+WAZUH_PASSWORD=<wazuh-api-password>
+
+WAZUH_INDEXER_URL=https://localhost:9200
+WAZUH_INDEXER_USER=<indexer-username>
+WAZUH_INDEXER_PASSWORD=<indexer-password>
+
+Do not commit the .env file or any credentials to GitHub.
+
 Prowler Execution
 1. Activate Prowler on Kali
 cd /home/kali/prowler
 source .venv/bin/activate
-2. Verify AWS credentials
+2. Verify AWS Credentials
 aws sts get-caller-identity
 3. Run Prowler
 prowler aws
 
 Prowler generates the security scan results on Kali.
 
-4. Run the CyberFinGuard Prowler ingestion
+4. Run the CyberFinGuard Prowler Ingestion
 
 From the CyberFinGuard project directory on Windows:
 
-python backend/ingestion/prowler_ingestor.py
+python backend\ingestion\prowler_ingestor.py
 
 The ingestor connects to Kali through SSH, retrieves the Prowler results, normalizes them, and loads them into PostgreSQL.
 
@@ -81,65 +107,31 @@ http://127.0.0.1:8080
 
 Open the Keycloak Admin Console and make sure the cyberfinguard realm and required users, roles, groups, and MFA configuration are available.
 
-3. Run the Keycloak ingestion
+3. Run the Keycloak Ingestion
 
 From the CyberFinGuard project directory on Windows:
 
-python backend/ingestion/keycloak_ingestor.py
+python backend\ingestion\keycloak_ingestor.py
 
 The ingestor connects to Kali through SSH, retrieves Keycloak IAM data, and collects authentication events.
 
-4. Load Keycloak data into PostgreSQL
-python backend/ingestion/keycloak_db_loader.py
+4. Load Keycloak Data into PostgreSQL
+python backend\ingestion\keycloak_db_loader.py
 
 This stores the collected IAM data in PostgreSQL.
 
-Database Tables
-Prowler
-assets
-findings
-Keycloak
-iam_users
-iam_roles
-iam_groups
-iam_user_roles
-iam_user_groups
-iam_authentication_events
-Data Flow
-Security Tools
-      ↓
-   Ingestion
-      ↓
- Normalization
-      ↓
-  PostgreSQL
-      ↓
-Risk Engine / AI Layer
+Wazuh Setup
 
-### Wazuh
-
-Wazuh is used to collect endpoint and security telemetry.
-
-- Runs using WSL and Docker Desktop
-- Monitors registered endpoints through Wazuh agents
-- Collects security alerts
-- Extracts MITRE ATT&CK techniques
-- Normalizes alerts into CyberFinGuard findings
-- Stores alerts and endpoint assets in PostgreSQL
-
-Wazuh is currently deployed using the Wazuh Docker single-node setup.
-
-### Wazuh Setup
+Wazuh is deployed using WSL and Docker Desktop.
 
 1. Start Docker Desktop
 
 Make sure Docker Desktop is running and WSL integration is enabled.
 
-2. Verify Wazuh containers
+2. Verify Wazuh Containers
 
-From WSL:
+Open WSL and run:
 
-```bash
 docker ps
 
 The following Wazuh containers should be running:
@@ -147,12 +139,15 @@ The following Wazuh containers should be running:
 Wazuh Manager
 Wazuh Indexer
 Wazuh Dashboard
-Verify Wazuh API
+3. Verify Wazuh API
+
+From WSL:
+
 curl -k https://localhost:55000
 
 The API should respond and require authentication.
 
-Configure Wazuh environment variables
+4. Configure Wazuh Environment Variables
 
 Add the following to the CyberFinGuard .env file:
 
@@ -164,7 +159,7 @@ WAZUH_INDEXER_URL=https://localhost:9200
 WAZUH_INDEXER_USER=<indexer-username>
 WAZUH_INDEXER_PASSWORD=<indexer-password>
 
-Do not commit the .env file or any credentials to GitHub.
+Do not commit these credentials to GitHub.
 
 Wazuh Execution
 
@@ -190,6 +185,17 @@ agents count: 2
 MITRE techniques found: XX
 Done: X new assets, XX alerts
 Database Tables
+Prowler
+assets
+findings
+Keycloak
+iam_users
+iam_roles
+iam_groups
+iam_user_roles
+iam_user_groups
+iam_authentication_events
+Wazuh
 
 Wazuh uses the existing CyberFinGuard tables:
 
@@ -198,12 +204,30 @@ findings
 
 Wazuh agents are stored as assets, while Wazuh alerts are stored as security findings.
 
-Wazuh Role in CyberFinGuard
+Data Flow
+                    Security Tools
+                          ↓
+                    Data Ingestion
+                          ↓
+                     Normalization
+                          ↓
+                      PostgreSQL
+                          ↓
+                 Risk Engine / AI Layer
+Source-Specific Flow
+Prowler ────────┐
+                │
+Keycloak ───────┤
+                ├──→ Ingestion → Normalization → PostgreSQL
+Wazuh ──────────┤
+                │
+ZAP ────────────┘
+Role in CyberFinGuard
 
-Wazuh provides endpoint and security telemetry and complements the other ingestion sources:
+Each security source provides different types of security data:
 
 Source	Purpose
-Prowler	AWS/cloud security
+Prowler	AWS / cloud security
 Keycloak	IAM, users, roles, groups and MFA
 Wazuh	Endpoint and security telemetry
 ZAP	Web application security
@@ -211,26 +235,10 @@ OpenVAS	Vulnerability scanning
 
 The collected data is stored in PostgreSQL and can subsequently be used by the CyberFinGuard risk engine for risk analysis and quantification.
 
-
-Then replace your existing **Current Status** with:
-
-```markdown
-## Data Flow
-
-```text
-Security Tools
-      ↓
-   Ingestion
-      ↓
- Normalization
-      ↓
-  PostgreSQL
-      ↓
-Risk Engine / AI Layer
 Current Status
-
-Prowler – Integrated
-Keycloak – Integrated
-Wazuh – Integrated
-OpenVAS – To be integrated
-ZAP – Integrated
+Source	Status
+Prowler	Integrated
+Keycloak	Integrated
+Wazuh	Integrated
+ZAP	Integrated
+OpenVAS	To be integrated
