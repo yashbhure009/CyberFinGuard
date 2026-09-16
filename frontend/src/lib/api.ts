@@ -9,6 +9,9 @@ import type {
   User,
   UserRole,
   WebsiteTarget,
+  TechnicalDashboardSummary,
+  TechnicalFindingRow,
+  AIRecommendation,
 } from "@/types";
 
 const wait = (milliseconds = 450) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -94,4 +97,32 @@ export async function saveAssessmentProgress(progress: AssessmentProgress): Prom
     completedSteps: Object.values(progress).map((_, index) => index),
     updatedAt: new Date().toISOString(),
   };
+}
+
+export async function getTechnicalDashboardData(): Promise<{ summary: TechnicalDashboardSummary; findings: TechnicalFindingRow[] }> {
+  return request("/api/dashboard/technical");
+}
+
+export async function getMitigationRecommendations(assetId: string): Promise<{ source: "ai"; recommendations: AIRecommendation[] }> {
+  return request(`/api/risk-analysis/recommendations`, { method: "POST", body: JSON.stringify({ asset_id: assetId }) });
+}
+
+export type AssistantMode = "ask" | "simulate";
+export type AssistantQueryPayload = {
+  mode: AssistantMode;
+  question: string;
+  scenario?: { type: string; params: Record<string, unknown> };
+};
+export type AssistantAskResponse = { answer: string; groundedIn: string[] };
+export type AssistantSimulationResponse = {
+  scenarioSummary: string;
+  baselineAle: number | null;
+  simulatedAle: number | null;
+  deltaPercent: number | null;
+  assumptions: string[];
+  isIllustrative: true;
+};
+
+export async function queryAssistant(mode: AssistantMode, payload: Omit<AssistantQueryPayload, "mode">): Promise<AssistantAskResponse | AssistantSimulationResponse> {
+  return request(`/api/assistant/query`, { method: "POST", body: JSON.stringify({ mode, ...payload }) });
 }

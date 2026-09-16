@@ -1,8 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, IPvAnyAddress, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, IPvAnyAddress, SecretStr, model_validator
 
 
 class APIModel(BaseModel):
@@ -31,6 +31,36 @@ class IAMTargetCreate(APIModel):
     realm: Annotated[str, Field(min_length=1, max_length=255)]
     client_id: Annotated[str, Field(min_length=1, max_length=255)]
     client_secret: SecretStr
+
+
+class RiskRecommendationsRequest(BaseModel):
+    asset_id: str | None = None
+    findings_summary: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def validate_input(self) -> "RiskRecommendationsRequest":
+        if not self.asset_id and not self.findings_summary:
+            raise ValueError("asset_id or findings_summary is required")
+        return self
+
+
+class AssistantScenario(BaseModel):
+    type: str = Field(min_length=1, max_length=80)
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class AssistantQueryRequest(BaseModel):
+    mode: Literal["ask", "simulate"]
+    question: Annotated[str, Field(min_length=1, max_length=2000)]
+    scenario: AssistantScenario | None = None
+
+
+class AIRecommendation(BaseModel):
+    control_name: str
+    description: str
+    risk_reduction: float = Field(ge=0, le=100)
+    roi_estimate: str
+    priority: int = Field(ge=1, le=5)
 
 
 class BusinessContextCreate(APIModel):

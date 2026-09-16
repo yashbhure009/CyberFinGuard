@@ -16,6 +16,7 @@ psycopg2-binary==2.9.9
 # HTTP Requests & APIs
 requests==2.31.0
 urllib3==2.1.0
+openai>=1.0.0,<2.0.0
 
 # Environment & Configuration
 python-dotenv==1.0.0

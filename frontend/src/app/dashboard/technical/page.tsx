@@ -1,11 +1,11 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { TechnicalDashboardSection } from "@/components/technical/technical-dashboard-section";
+import { TechnicalDashboardLive } from "@/components/technical/technical-dashboard-live";
 import { mockUser } from "@/lib/mock-data";
 
 export default function TechnicalDashboardPage() {
   return (
     <AppShell user={mockUser} title="Technical Dashboard" eyebrow="Security operations & risk intelligence">
-      <TechnicalDashboardSection />
+      <TechnicalDashboardLive />
     </AppShell>
   );
 }

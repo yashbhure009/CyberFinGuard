@@ -6,7 +6,16 @@ export const loginSchema = z.object({
 });
 
 export const websiteSchema = z.object({
-  url: z.string().url("Enter a complete URL, including https://"),
+  url: z.string().trim().refine((value) => {
+    try {
+      if (/^(https?:\/\/)/i.test(value)) return Boolean(new URL(value).hostname);
+      if (/^[a-f0-9:]+$/i.test(value) && value.includes(":")) return true;
+      return value.split(".").length === 4 && value.split(".").every((part) => {
+        const number = Number(part);
+        return /^\d{1,3}$/.test(part) && number >= 0 && number <= 255;
+      });
+    } catch { return false; }
+  }, "Enter a valid website URL or IP address"),
 });
 
 export const networkSchema = z.object({

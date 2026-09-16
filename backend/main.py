@@ -1,4 +1,5 @@
 import os
+import json
 from collections.abc import Iterator
 from urllib.parse import urlparse
 
@@ -15,7 +16,11 @@ from backend.models import (
     IAMTargetCreate,
     NetworkTargetCreate,
     WebsiteTargetCreate,
+    AIRecommendation,
+    RiskRecommendationsRequest,
+    AssistantQueryRequest,
 )
+from pydantic import TypeAdapter, ValidationError
 from backend.repository import AssetRepository
 
 app = FastAPI(title="CyberFinGuard API", version="0.1.0")
@@ -54,6 +59,185 @@ def response(asset: dict, unmapped: list[str] | None = None) -> AssetResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/risk-analysis/recommendations")
+def generate_recommendations(payload: RiskRecommendationsRequest) -> dict[str, object]:
+    # OpenRouter exposes an OpenAI-compatible chat-completions API.
+    # Keep OPENAI_API_KEY as a migration fallback for existing local setups.
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key or api_key in {"your-key-here", "your-openrouter-key-here"}:
+        raise HTTPException(status_code=503, detail="AI recommendations not configured")
+
+    context = payload.findings_summary
+    if payload.asset_id:
+        with db.connection() as connection:
+            context = AssetRepository(connection).get_risk_analysis_context(payload.asset_id)
+        if context is None:
+            raise HTTPException(status_code=404, detail="Asset not found")
+    prompt = """Return a JSON object with a `recommendations` array of mitigation recommendation objects for this cybersecurity asset. Use only these keys in each item: control_name, description, risk_reduction, roi_estimate, priority. Keep risk_reduction as a percentage from 0 to 100, roi_estimate as a rough multiplier string, and priority as an integer from 1 (highest) to 5. These are ROUGH ORDER-OF-MAGNITUDE ESTIMATES based on general security investment patterns, not precise calculations. Do not fabricate an investment_cost or any currency amount because no real cost data is provided. Give one-sentence descriptions. Asset and finding context follows:\n""" + json.dumps(context or {}, default=str)
+    try:
+        from openai import APIConnectionError, APIError, APITimeoutError, AuthenticationError, OpenAI, RateLimitError
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail="AI client is not installed") from exc
+
+    try:
+        base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip()
+        default_headers = {
+            "X-OpenRouter-Title": os.getenv("OPENROUTER_APP_TITLE", "CyberFinGuard"),
+        }
+        referer = os.getenv("OPENROUTER_HTTP_REFERER", "").strip()
+        if referer:
+            default_headers["HTTP-Referer"] = referer
+
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            default_headers=default_headers,
+            timeout=30.0,
+        )
+        completion = client.chat.completions.create(
+            model=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+            messages=[
+                {"role": "system", "content": "You provide cautious, neutral cybersecurity mitigation estimates. Never claim precise financial calculations."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+    except AuthenticationError as exc:
+        raise HTTPException(status_code=502, detail="AI provider authentication failed") from exc
+    except RateLimitError as exc:
+        raise HTTPException(status_code=502, detail="AI provider rate limit reached") from exc
+    except APITimeoutError as exc:
+        raise HTTPException(status_code=502, detail="AI provider request timed out") from exc
+    except APIConnectionError as exc:
+        raise HTTPException(status_code=502, detail="Unable to connect to AI provider") from exc
+    except APIError as exc:
+        raise HTTPException(status_code=502, detail="AI provider API error") from exc
+
+    content = completion.choices[0].message.content if completion.choices else None
+    try:
+        parsed = json.loads(content or "")
+        records = parsed if isinstance(parsed, list) else parsed.get("recommendations")
+        recommendations = TypeAdapter(list[AIRecommendation]).validate_python(records)
+    except (json.JSONDecodeError, TypeError, AttributeError, ValidationError) as exc:
+        raise HTTPException(status_code=502, detail="AI provider returned invalid recommendation data") from exc
+    return {"source": "ai", "recommendations": [recommendation.model_dump() for recommendation in recommendations]}
+
+
+def _assistant_json_completion(messages: list[dict[str, str]]) -> dict[str, object]:
+    """Call OpenRouter through the already-installed OpenAI-compatible SDK."""
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key or api_key in {"your-key-here", "your-openrouter-key-here"}:
+        raise HTTPException(status_code=503, detail="AI assistant not configured")
+    try:
+        from openai import APIConnectionError, APIError, APITimeoutError, AuthenticationError, OpenAI, RateLimitError
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail="AI client is not installed") from exc
+
+    try:
+        client = OpenAI(
+            api_key=api_key,
+            base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip(),
+            default_headers={"X-OpenRouter-Title": os.getenv("OPENROUTER_APP_TITLE", "CyberFinGuard")},
+            timeout=30.0,
+        )
+        completion = client.chat.completions.create(
+            model=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+    except AuthenticationError as exc:
+        raise HTTPException(status_code=502, detail="AI provider authentication failed") from exc
+    except RateLimitError as exc:
+        raise HTTPException(status_code=502, detail="AI provider rate limit reached") from exc
+    except APITimeoutError as exc:
+        raise HTTPException(status_code=502, detail="AI provider request timed out") from exc
+    except APIConnectionError as exc:
+        raise HTTPException(status_code=502, detail="Unable to connect to AI provider") from exc
+    except APIError as exc:
+        raise HTTPException(status_code=502, detail="AI provider API error") from exc
+
+    try:
+        parsed = json.loads(completion.choices[0].message.content or "") if completion.choices else None
+        if not isinstance(parsed, dict):
+            raise ValueError("Expected a JSON object")
+        return parsed
+    except (json.JSONDecodeError, TypeError, ValueError, AttributeError) as exc:
+        raise HTTPException(status_code=502, detail="AI provider returned malformed JSON") from exc
+
+
+def _assistant_context() -> dict[str, object]:
+    with db.connection() as connection:
+        return AssetRepository(connection).get_assistant_context()
+
+
+def _simulate_scenario(context: dict[str, object], scenario_type: str, params: dict[str, object]) -> dict[str, object]:
+    baseline = context.get("total_ale")
+    assets = context.get("simulation_assets", [])
+    assumptions: list[str]
+    simulated = baseline if isinstance(baseline, (int, float)) else None
+
+    if scenario_type == "enforce_mfa":
+        scope = params.get("scope", "all_assets")
+        privileged = scope == "all_privileged"
+        affected = [asset for asset in assets if not asset.get("mfa_enabled") and (not privileged or (asset.get("criticality") or 0) >= 4)]
+        affected_ale = sum(float(asset.get("ale") or 0) for asset in affected)
+        # Illustrative assumption: closing an MFA gap reduces the affected ALE contribution by 25%.
+        assumptions = ["Illustrative only; not the real risk engine.", "Affected assets are those with mfa_enabled=false.", "all_privileged means criticality 4 or 5.", "Assumes a flat 25% reduction to affected ALE contribution."]
+        if simulated is not None:
+            simulated = max(0, simulated - affected_ale * 0.25)
+        summary = f"Enforcing MFA for {scope.replace('_', ' ')} would affect {len(affected)} currently unprotected asset(s) under the stated assumption."
+    elif scenario_type == "delay_remediation":
+        try:
+            days = max(0, float(params.get("days", 0)))
+        except (TypeError, ValueError):
+            days = 0
+        unpatched_ale = sum(float(asset.get("ale") or 0) for asset in assets if asset.get("patching_status") == "unpatched")
+        # Illustrative assumption: unpatched ALE contribution increases linearly by 1% per 30 days.
+        increase = days / 30 * 0.01
+        assumptions = ["Illustrative only; not the real risk engine.", "Only assets marked patching_status=unpatched are affected.", "Assumes a linear 1% increase to unpatched ALE contribution per 30-day delay."]
+        if simulated is not None:
+            simulated = baseline + unpatched_ale * increase
+        summary = f"Delaying remediation by {days:g} day(s) increases the unpatched contribution under the stated linear assumption."
+    else:
+        result = _assistant_json_completion([
+            {"role": "system", "content": "You are a cautious what-if assistant. Use only the supplied data context. State assumptions plainly, give directional illustrative reasoning only, never present a precise calculated figure, and remind the user this is a discussion aid, not a decision-grade number. Return JSON with scenarioSummary, baselineAle, simulatedAle, deltaPercent, and assumptions."},
+            {"role": "user", "content": json.dumps({"data_context": context, "question": params.get("question", "")}, default=str)},
+        ])
+        result["isIllustrative"] = True
+        result.setdefault("assumptions", ["Illustrative discussion aid based on the supplied data context; not a decision-grade calculation."])
+        return result
+
+    delta = ((simulated - baseline) / baseline * 100) if isinstance(baseline, (int, float)) and baseline else None
+    return {"scenarioSummary": summary, "baselineAle": baseline, "simulatedAle": simulated, "deltaPercent": delta, "assumptions": assumptions, "isIllustrative": True}
+
+
+@app.post("/api/assistant/query")
+def assistant_query(payload: AssistantQueryRequest) -> dict[str, object]:
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key or api_key in {"your-key-here", "your-openrouter-key-here"}:
+        raise HTTPException(status_code=503, detail="AI assistant not configured")
+    context = _assistant_context()
+    if payload.mode == "simulate":
+        scenario = payload.scenario
+        if scenario and scenario.type in {"enforce_mfa", "delay_remediation"}:
+            return _simulate_scenario(context, scenario.type, scenario.params)
+        scenario_params = dict(scenario.params) if scenario else {}
+        scenario_params["question"] = payload.question
+        return _simulate_scenario(context, scenario.type if scenario else "free_text", scenario_params)
+
+    result = _assistant_json_completion([
+        {"role": "system", "content": "You are CyberRobo, a helpful cybersecurity and financial cyber-risk assistant. Answer general cybersecurity, IAM, vulnerability, controls, and risk-management questions using your general knowledge. For definitions, acronyms, and concept questions such as 'What is EPSS?', answer the definition directly and concisely from general knowledge first; do not refuse or lead with missing dashboard data. When a question asks about this organization's specific assets, findings, controls, coverage, or risk scores, use only the supplied CyberFinGuard data context: cite the specific figures used, say 'not yet calculated' for pending or missing risk_scores values, and never invent organization-specific numbers. If a question mixes general and organization-specific parts, answer the general part and clearly label any organization-specific limitation. For IAM questions, use iam_setup_status and assets_by_type: explain that missing IAM representation means identity-access coverage cannot be verified, and distinguish that dataset limitation from proof that every IAM control is absent. Return JSON with answer and groundedIn, where groundedIn is an array of the data points or general knowledge basis actually used."},
+        {"role": "user", "content": json.dumps({"data_context": context, "question": payload.question}, default=str)},
+    ])
+    answer = result.get("answer")
+    grounded_in = result.get("groundedIn")
+    if not isinstance(answer, str) or not isinstance(grounded_in, list) or not all(isinstance(item, str) for item in grounded_in):
+        raise HTTPException(status_code=502, detail="AI provider returned an invalid assistant response")
+    return {"answer": answer, "groundedIn": grounded_in}
 
 
 @app.post("/api/assets/website", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)
@@ -142,4 +326,3 @@ def get_asset(asset_id: str, repository: AssetRepository = Depends(get_repositor
     if asset is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
     return response(asset)
-
