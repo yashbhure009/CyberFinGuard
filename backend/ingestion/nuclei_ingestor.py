@@ -9,6 +9,7 @@ import logging
 import uuid
 import os
 import sys
+import time
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -27,40 +28,77 @@ class NucleiIngestor:
     def __init__(self):
         self.asset_id = 'web_target'
 
-    def run_scan(self, target, severity='medium,high,critical'):
+    def run_scan(self, target, severity='low,medium,high,critical'):
         """Run Nuclei scan and save JSON output"""
         output_file = f'nuclei_{target.replace("://", "_").replace("/", "_").replace(".", "_")}.json'
-        
+
+        # Sanity check: templates installed?
+        templates_dir = os.path.expanduser(r'~\nuclei-templates')
+        if not os.path.isdir(templates_dir):
+            logger.error(f"❌ Nuclei templates not found at {templates_dir}")
+            logger.error("   Fix: run  nuclei -update-templates")
+            return None
+
         cmd = [
             NUCLEI_PATH,
             '-u', target,
             '-severity', severity,
             '-jsonl',
-            '-o', output_file
+            '-o', output_file,
+            '-rate-limit', '150',
+            '-timeout', '10',
+            '-retries', '2',
+            '-c', '50',
+            '-stats',
+            '-stats-interval', '15',
+            '-no-interactsh',          # skip OOB server if not needed (much faster)
         ]
-        
+
         logger.info(f"🚀 Running Nuclei scan on {target}...")
-        
+        logger.info(f"   Severity: {severity}")
+
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
-                timeout=900  # 15 minutes
+                bufsize=1,
             )
-            
-            if result.returncode == 0:
-                logger.info(f"✅ Scan complete: {output_file}")
-                return output_file
-            else:
-                logger.error(f"❌ Scan failed: {result.stderr[:200]}")
+
+            start = time.time()
+            for line in proc.stdout:
+                line = line.rstrip()
+                if line:
+                    logger.info(f"   [nuclei] {line}")
+                if time.time() - start > 900:
+                    proc.kill()
+                    logger.error("❌ Scan timeout (15 min)")
+                    return None
+
+            proc.wait(timeout=30)
+
+            if proc.returncode != 0:
+                logger.error(f"❌ Scan failed (exit {proc.returncode})")
                 return None
-        except subprocess.TimeoutExpired:
-            logger.error("❌ Scan timeout (15 min)")
-            return None
+
+            # ✅ Real success check
+            if not os.path.exists(output_file):
+                logger.warning("⚠️ Nuclei exited 0 but produced no output file")
+                return None
+
+            size = os.path.getsize(output_file)
+            if size == 0:
+                logger.warning("⚠️ Nuclei produced an empty file — 0 findings (target may be clean)")
+            else:
+                logger.info(f"✅ Scan complete: {output_file} ({size} bytes)")
+
+            return output_file
+
         except Exception as e:
             logger.error(f"❌ Scan error: {e}")
             return None
+
 
     def parse_json(self, json_file):
         """Parse Nuclei JSON output"""
@@ -142,12 +180,25 @@ class NucleiIngestor:
         
         return {'source': 'nuclei', 'findings_ingested': count}
 
-    def run(self, target='http://localhost:3000'):
+    def run(self, target=None, severity='low,medium,high,critical'):
         """Full pipeline: scan → parse → ingest"""
-        json_file = self.run_scan(target)
+        if not target:
+            target = os.getenv('NUCLEI_TARGET_URL', 'https://httpbin.org')
+
+        logger.info(f"🎯 Nuclei target: {target}")
+        logger.info(f"   Severity: {severity}")
+
+        json_file = self.run_scan(target, severity=severity)
         if not json_file:
-            return {'source': 'nuclei', 'error': 'scan_failed'}
-        return self.ingest(json_file)
+            return {'source': 'nuclei', 'error': 'scan_failed', 'findings_ingested': 0}
+
+        result = self.ingest(json_file)
+
+        if result.get('findings_ingested', 0) == 0:
+            result['note'] = 'scan_completed_no_findings'
+            logger.info("ℹ️  Scan completed with 0 findings")
+
+        return result
 
 
 if __name__ == "__main__":

@@ -1,13 +1,14 @@
 """
 CyberFinGuard — Unified Ingestion Runner
 Outputs unified findings JSON for downstream models
-With user-config integration (website, cloud, identity, business context)
+With Nexora website integration (full pipeline)
 """
 
 import os
 import sys
 import json
 import logging
+import socket
 from datetime import datetime
 
 # ============================================================
@@ -31,8 +32,14 @@ logger = logging.getLogger(__name__)
 OUTPUT_DIR = os.getenv('UNIFIED_OUTPUT_DIR', 'data/unified_findings')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# User config file (written by API from frontend form)
+# User config file
 SCAN_CONFIG_PATH = os.path.join(ROOT_DIR, 'scan_config.json')
+
+# Nexora target (default)
+NEXORA_URL = "https://desktop-72ti05t.tailc1051b.ts.net/"
+
+# Hardcoded IPv4 (DNS multiple IPs de raha hai)
+NEXORA_IP = "103.84.155.217"
 
 
 # ============================================================
@@ -74,7 +81,6 @@ def _safe_string(value, default="None"):
 
 
 def parse_raw_data(raw):
-    """Safely parse raw_data (can be str, dict, or None)"""
     if not raw:
         return {}
     if isinstance(raw, dict):
@@ -87,62 +93,40 @@ def parse_raw_data(raw):
     return {}
 
 
-def _detect_patched(raw):
-    if raw.get("patched") is not None:
-        return "Yes" if raw["patched"] else "No"
-    if raw.get("patch_status"):
-        return raw["patch_status"]
-    return "Unknown"
-
-
-def _detect_mfa(raw):
-    if raw.get("mfa") is not None:
-        return "Yes" if raw["mfa"] else "No"
-    if raw.get("mfa_enabled") is not None:
-        return "Yes" if raw["mfa_enabled"] else "No"
-    if raw.get("totp") is not None:
-        return "Yes" if raw["totp"] else "No"
-    return "Unknown"
-
-
-def _detect_waf(raw):
-    if raw.get("waf") is not None:
-        return "Yes" if raw["waf"] else "No"
-    if raw.get("waf_enabled") is not None:
-        return "Yes" if raw["waf_enabled"] else "No"
-    return "Unknown"
-
-
-def _detect_edr(raw):
-    if raw.get("edr") is not None:
-        return "Yes" if raw["edr"] else "No"
-    if raw.get("edr_enabled") is not None:
-        return "Yes" if raw["edr_enabled"] else "No"
-    return "Unknown"
+def get_ip_from_hostname(hostname):
+    """Hostname se IPv4 nikalo"""
+    try:
+        return socket.gethostbyname(hostname)
+    except:
+        return NEXORA_IP  # Fallback
 
 
 # ============================================================
 # INGESTOR RUNNERS
 # ============================================================
 
-def run_zap(target=None):
+def run_zap_manual(target_url=None):
+    """ZAP Manual scan — 92 findings (Nexora)"""
     try:
         logger.info("=" * 60)
-        logger.info("🕷️ Running ZAP Ingestor...")
-        from backend.ingestion.zap_ingestor import ZAPIngestor
-        ingestor = ZAPIngestor()
-        result = ingestor.run(target_url=target)
-        logger.info(f"✅ ZAP: {result}")
+        logger.info("🕷️ Running ZAP MANUAL scan...")
+        from backend.ingestion.zap_manual_scan import ZAPManualScan
+        
+        scanner = ZAPManualScan()
+        result = scanner.run(target_url or NEXORA_URL)
+        logger.info(f"✅ ZAP Manual: {result}")
         return result
     except Exception as e:
-        logger.error(f"❌ ZAP failed: {e}")
+        logger.error(f"❌ ZAP Manual failed: {e}")
         return {"source": "zap", "error": str(e)}
 
 
-def run_nmap(target='scanme.nmap.org'):
+def run_nmap(target=None):
+    """Nmap scan — Nexora IP"""
     try:
+        target = target or NEXORA_IP
         logger.info("=" * 60)
-        logger.info("🔍 Running Nmap Ingestor...")
+        logger.info(f"🔍 Running Nmap on {target}...")
         from backend.ingestion.nmap_ingestor import NmapIngestor
         ingestor = NmapIngestor()
         result = ingestor.run(target=target)
@@ -153,13 +137,16 @@ def run_nmap(target='scanme.nmap.org'):
         return {"source": "nmap", "error": str(e)}
 
 
-def run_nuclei(target='https://httpbin.org'):
+def run_nuclei(target=None, severity='low,medium,high,critical'):
+    """Nuclei scan — httpbin.org test target"""
     try:
-        logger.info("=" * 60)
-        logger.info("🎯 Running Nuclei Ingestor...")
+        target = target or 'https://httpbin.org'
+        logger.info(f"🎯 Running Nuclei on {target}")
+        logger.info(f"   Severity: {severity}")
+
         from backend.ingestion.nuclei_ingestor import NucleiIngestor
         ingestor = NucleiIngestor()
-        result = ingestor.run(target=target)
+        result = ingestor.run(target=target, severity=severity)
         logger.info(f"✅ Nuclei: {result}")
         return result
     except Exception as e:
@@ -168,6 +155,7 @@ def run_nuclei(target='https://httpbin.org'):
 
 
 def run_wazuh():
+    """Wazuh — Local Docker"""
     try:
         logger.info("=" * 60)
         logger.info("📊 Running Wazuh Ingestor...")
@@ -182,6 +170,7 @@ def run_wazuh():
 
 
 def run_prowler():
+    """Prowler — AWS scan"""
     try:
         logger.info("=" * 60)
         logger.info("☁️ Running Prowler Ingestor...")
@@ -196,6 +185,7 @@ def run_prowler():
 
 
 def run_keycloak():
+    """Keycloak — Local Docker (8090)"""
     try:
         logger.info("=" * 60)
         logger.info("🔐 Running Keycloak Ingestor...")
@@ -210,6 +200,7 @@ def run_keycloak():
 
 
 def run_threat_intel_enricher():
+    """Threat Intel — CVSS/EPSS/KEV enrichment"""
     try:
         logger.info("=" * 60)
         logger.info("🛡️ Running Threat Intel Enricher...")
@@ -269,73 +260,43 @@ def fetch_unified_findings(business_context=None):
     """
 
     findings = db.execute_query(query)
-
     unified = []
+
     for f in findings:
         raw = parse_raw_data(f.get('raw_data'))
 
-        # ====================================================
         # LIKELIHOOD
-        # ====================================================
         likelihood = {
             "cvss_score": _safe_float(f.get('cvss_score'), default=5.0),
             "epss_score": _safe_float(f.get('epss_score'), default=0.1),
-            "exploit_available": _safe_string(
-                "Yes" if f.get('cisa_kev') else raw.get("exploit_available"),
-                default="No"
-            ),
+            "exploit_available": "Yes" if f.get('cisa_kev') else "No",
             "exploit_type": _safe_string(raw.get("exploit_type"), default="None"),
             "threat_actor": _safe_string(raw.get("threat_actor"), default="Unknown_Actor"),
             "malware": _safe_string(raw.get("malware"), default="No"),
             "mitre_technique": _safe_string(f.get('mitre_technique'), default="T0000"),
-            "patched": _safe_string(_detect_patched(raw), default="No"),
-            "mfa": _safe_string(_detect_mfa(raw), default="No"),
-            "waf": _safe_string(_detect_waf(raw), default="No"),
-            "edr": _safe_string(_detect_edr(raw), default="No"),
+            "patched": "No",
+            "mfa": "No",
+            "waf": "No",
+            "edr": "No",
         }
 
-        # ====================================================
-        # IMPACT — user business context overrides DB values
-        # ====================================================
-        def _pick(user_key, db_key, cast=None):
-            """Prefer user-provided value over DB value."""
-            user_val = business_context.get(user_key)
-            if user_val not in (None, "", "0"):
-                try:
-                    return cast(user_val) if cast else user_val
-                except (ValueError, TypeError):
-                    return user_val
-            db_val = f.get(db_key)
-            if db_val is None:
-                return None
-            try:
-                return cast(db_val) if cast else db_val
-            except (ValueError, TypeError):
-                return db_val
-
+        # IMPACT
         impact = {
-            "asset_name": _safe_string(_pick("asset_name", "asset_name"), default="Unknown_Asset"),
-            "asset_type": _safe_string(_pick("asset_type", "asset_type"), default="unknown"),
-            "business_unit": _safe_string(business_context.get("business_unit"), default="unknown"),
-            "asset_owner": _safe_string(business_context.get("asset_owner"), default="unknown"),
-            "asset_value": _safe_float(
-                business_context.get("business_value") or f.get('asset_value'),
-                default=1000000.0
-            ),
-            "downtime_cost_per_hour": _safe_float(business_context.get("downtime_cost"), default=0.0),
-            "recovery_cost": _safe_float(business_context.get("recovery_cost"), default=0.0),
-            "criticality": int(_safe_float(f.get('criticality'), default=3.0)),
-            "environment": _safe_string(f.get('environment'), default="unknown"),
-            "production_status": _safe_string(f.get('production_status'), default="unknown"),
-            "ip_address": _safe_string(f.get('ip_address'), default="0.0.0.0"),
-            "hostname": _safe_string(f.get('hostname'), default="unknown-host"),
-            "data_classification": _safe_string(raw.get("data_classification"), default="internal"),
-            "compliance_scope": raw.get("compliance_scope") or [],
+            "asset_name": _safe_string(f.get('asset_name') or business_context.get("asset_name"), default="Nexora Website"),
+            "asset_type": _safe_string(f.get('asset_type') or business_context.get("asset_type"), default="web_application"),
+            "business_unit": _safe_string(business_context.get("business_unit"), default="Digital Banking"),
+            "asset_owner": _safe_string(business_context.get("asset_owner"), default="Alex Morgan"),
+            "asset_value": _safe_float(business_context.get("business_value") or f.get('asset_value'), default=50000000.0),
+            "downtime_cost_per_hour": _safe_float(business_context.get("downtime_cost"), default=250000.0),
+            "recovery_cost": _safe_float(business_context.get("recovery_cost"), default=5000000.0),
+            "criticality": int(_safe_float(f.get('criticality'), default=5.0)),
+            "environment": _safe_string(f.get('environment'), default="production"),
+            "production_status": _safe_string(f.get('production_status'), default="production"),
+            "ip_address": _safe_string(f.get('ip_address'), default=NEXORA_IP),
+            "hostname": _safe_string(f.get('hostname'), default="desktop-72ti05t.tailc1051b.ts.net"),
         }
 
-        # ====================================================
         # METADATA
-        # ====================================================
         created_at = f.get('created_at')
         age_days = None
         if created_at:
@@ -344,35 +305,16 @@ def fetch_unified_findings(business_context=None):
             except Exception:
                 age_days = None
 
-        _now = datetime.now().isoformat()
         metadata = {
             "discovered_at": _safe_string(
                 raw.get("@timestamp") or (created_at.isoformat() if created_at else None),
-                default=_now
-            ),
-            "created_at": _safe_string(
-                created_at.isoformat() if created_at else None,
-                default=_now
-            ),
-            "updated_at": _safe_string(
-                raw.get("updated_at") or (created_at.isoformat() if created_at else None),
-                default=_now
+                default=datetime.now().isoformat()
             ),
             "source_tool": _safe_string(f.get('source'), default="unknown"),
-            "source_version": _safe_string(
-                raw.get("version") or raw.get("rule", {}).get("version"),
-                default="unknown"
-            ),
-            "scan_id": _safe_string(
-                raw.get("scan_id") or raw.get("id"),
-                default="no-scan-id"
-            ),
             "finding_age_days": int(age_days) if age_days is not None else 0,
         }
 
-        # ====================================================
         # FINAL FINDING
-        # ====================================================
         finding = {
             "finding_id": f['finding_id'],
             "asset_id": f['asset_id'],
@@ -380,15 +322,11 @@ def fetch_unified_findings(business_context=None):
             "severity": _safe_string(f.get('severity'), default="info").lower(),
             "title": _safe_string(f.get('title'), default="Untitled Finding"),
             "description": _safe_string(f.get('description'), default="No description available"),
-
             "likelihood": likelihood,
             "impact": impact,
             "metadata": metadata,
-
             "detail": raw,
             "framework_tags": [],
-
-            # Model placeholders
             "remediation_cost": None,
             "risk_reduction": None,
             "risk_score": None,
@@ -402,21 +340,15 @@ def fetch_unified_findings(business_context=None):
 
 
 def save_unified_output(findings, user_config=None):
-    """Save unified findings to JSON file for downstream models"""
+    """Save unified findings to JSON file"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     user_config = user_config or {}
 
     output = {
         "generated_at": datetime.now().isoformat(),
         "scan_config": {
-            "target_url": user_config.get("target_url"),
-            "cloud": user_config.get("cloud", {}),
-            "identity": {
-                # Never write client_secret to output
-                "url": user_config.get("identity", {}).get("url"),
-                "realm": user_config.get("identity", {}).get("realm"),
-                "client_id": user_config.get("identity", {}).get("client_id"),
-            },
+            "target_url": user_config.get("target_url", NEXORA_URL),
+            "target_ip": NEXORA_IP,
             "business": user_config.get("business", {}),
         },
         "total_findings": len(findings),
@@ -466,34 +398,62 @@ def main(target_url=None):
     print(f"⏰ Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60 + "\n")
 
-    # ============================================
+    # ============================================================
     # LOAD USER CONFIG
-    # ============================================
+    # ============================================================
     user_config = load_user_config()
 
-    # Override target_url from config if not given via CLI
-    if not target_url and user_config.get('target_url'):
-        target_url = user_config['target_url']
+    # Priority: CLI arg > user config > default Nexora
+    if not target_url:
+        target_url = user_config.get('target_url') or NEXORA_URL
 
     business_context = user_config.get('business', {})
 
+    # ============================================================
+    # EXTRACT HOSTNAME/IP
+    # ============================================================
+    hostname = target_url.replace("https://", "").replace("http://", "").split("/")[0]
+    target_ip = get_ip_from_hostname(hostname)
+
     print(f"🎯 Target URL: {target_url}")
-    print(f"🏢 Business context: {business_context}")
+    print(f"🌐 Target IP:  {target_ip}")
+    print(f"🏢 Business:   {business_context.get('asset_name', 'Nexora Website')}")
+    print(f"   Unit:       {business_context.get('business_unit', 'Digital Banking')}")
+    print(f"   Value:      ₹{business_context.get('business_value', '50000000')}")
     print()
 
-    # ============================================
+    # ============================================================
     # RUN ALL INGESTORS
-    # ============================================
+    # ============================================================
     results = {}
 
-    results['zap'] = run_zap(target=target_url)
-    results['nmap'] = run_nmap(target='scanme.nmap.org')
-    results['nuclei'] = run_nuclei(target=target_url or 'https://httpbin.org')
+    # 1. ZAP — Manual scan (Nexora website)
+    results['zap'] = run_zap_manual(target_url=target_url)
+
+    # 2. Nmap — Nexora IP
+    results['nmap'] = run_nmap(target=target_ip)
+
+    # 3. Nuclei — Nexora website (all severities)
+    results['nuclei'] = run_nuclei(
+        target=target_url,
+        severity='low,medium,high,critical'
+    )
+
+    # 4. Wazuh — Local Docker
     results['wazuh'] = run_wazuh()
+
+    # 5. Prowler — AWS
     results['prowler'] = run_prowler()
+
+    # 6. Keycloak — Local Docker (8090)
     results['keycloak'] = run_keycloak()
+
+    # 7. Threat Intel — Enrich CVEs
     results['threat_intel'] = run_threat_intel_enricher()
 
+    # ============================================================
+    # SUMMARY
+    # ============================================================
     print("\n" + "=" * 60)
     print("📊 INGESTION SUMMARY")
     print("=" * 60)
@@ -504,8 +464,11 @@ def main(target_url=None):
             for key, value in result.items():
                 print(f"   {key}: {value}")
 
+    # ============================================================
+    # UNIFIED OUTPUT
+    # ============================================================
     print("\n" + "=" * 60)
-    print("📋 GENERATING UNIFIED OUTPUT FOR DOWNSTREAM MODELS")
+    print("📋 GENERATING UNIFIED OUTPUT")
     print("=" * 60)
 
     findings = fetch_unified_findings(business_context=business_context)

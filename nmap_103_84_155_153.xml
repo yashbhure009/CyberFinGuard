@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///C:/Program Files (x86)/Nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.991 scan initiated Thu Sep 17 00:18:58 2026 as: &quot;C:\\Program Files (x86)\\Nmap\\nmap.exe&quot; -F -sV -T4 -oX nmap_103_84_155_153.xml 103.84.155.153 -->
+<nmaprun scanner="nmap" args="&quot;C:\\Program Files (x86)\\Nmap\\nmap.exe&quot; -F -sV -T4 -oX nmap_103_84_155_153.xml 103.84.155.153" start="1789584538" startstr="Thu Sep 17 00:18:58 2026" version="7.991" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="100" services="7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6646,7070,8000,8008-8009,8080-8081,8443,8888,9100,9999-10000,32768,49152-49157"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="103.84.155.153" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1789584543" endtime="1789584768"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="103.84.155.153" addrtype="ipv4"/>
+<hostnames>
+<hostname name="ingress-tok-01.tailscale.com" type="PTR"/>
+</hostnames>
+<ports><extraports state="filtered" count="95">
+<extrareasons reason="no-response" count="95" proto="tcp" ports="7,9,13,22-23,25-26,37,53,79,81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,444-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6646,7070,8000,8008-8009,8080-8081,8888,9100,9999,32768,49152-49157"/>
+</extraports>
+<port protocol="tcp" portid="21"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Golang net/http server" servicefp="SF-Port80-TCP:V=7.991%I=7%D=9/17%Time=6AAAE4AE%P=i686-pc-windows-windows%r(GetRequest,AC,&quot;HTTP/1\.0\x20302\x20Found\r\nContent-Type:\x20text/html;\x20charset=utf-8\r\nLocation:\x20https:///\r\nDate:\x20Wed,\x2016\x20Sep\x202026\x2018:49:18\x20GMT\r\nContent-Length:\x2032\r\n\r\n&lt;a\x20href=\&quot;https:///\&quot;&gt;Found&lt;/a&gt;\.\n\n&quot;)%r(HTTPOptions,63,&quot;HTTP/1\.0\x20302\x20Found\r\nLocation:\x20https:///\r\nDate:\x20Wed,\x2016\x20Sep\x202026\x2018:49:19\x20GMT\r\nContent-Length:\x200\r\n\r\n&quot;)%r(RTSPRequest,67,&quot;HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request&quot;)%r(FourOhFourRequest,F2,&quot;HTTP/1\.0\x20302\x20Found\r\nContent-Type:\x20text/html;\x20charset=utf-8\r\nLocation:\x20https:///nice%20ports%2C/Tri%6Eity\.txt%2ebak\r\nDate:\x20Wed,\x2016\x20Sep\x202026\x2018:49:21\x20GMT\r\nContent-Length:\x2067\r\n\r\n&lt;a\x20href=\&quot;https:///nice%20ports%2C/Tri%6Eity\.txt%2ebak\&quot;&gt;Found&lt;/a&gt;\.\n\n&quot;)%r(GenericLines,67,&quot;HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request&quot;)%r(Help,67,&quot;HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request&quot;)%r(SSLSessionReq,67,&quot;HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request&quot;)%r(LPDString,67,&quot;HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request&quot;)%r(SIPOptions,67,&quot;HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request&quot;)%r(Socks5,67,&quot;HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request&quot;)%r(OfficeScan,A3,&quot;HTTP/1\.1\x20400\x20Bad\x20Request:\x20missing\x20required\x20Host\x20header\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request:\x20missing\x20required\x20Host\x20header&quot;);" method="probed" conf="10"><cpe>cpe:/a:golang:go</cpe></service></port>
+<port protocol="tcp" portid="443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="https" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8443"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="https-alt" method="table" conf="3"/></port>
+<port protocol="tcp" portid="10000"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="snet-sensor-mgmt" method="table" conf="3"/></port>
+</ports>
+<times srtt="365620" rttvar="70560" to="647860"/>
+</host>
+<runstats><finished time="1789584768" timestr="Thu Sep 17 00:22:48 2026" summary="Nmap done at Thu Sep 17 00:22:48 2026; 1 IP address (1 host up) scanned in 229.75 seconds" elapsed="229.75" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>
