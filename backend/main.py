@@ -22,6 +22,7 @@ from backend.models import (
 )
 from pydantic import TypeAdapter, ValidationError
 from backend.repository import AssetRepository
+from backend.compliance_mapper import map_finding_to_frameworks
 
 app = FastAPI(title="CyberFinGuard API", version="0.1.0")
 app.add_middleware(
@@ -215,12 +216,56 @@ def _simulate_scenario(context: dict[str, object], scenario_type: str, params: d
     return {"scenarioSummary": summary, "baselineAle": baseline, "simulatedAle": simulated, "deltaPercent": delta, "assumptions": assumptions, "isIllustrative": True}
 
 
+def _is_compliance_summary_question(question: str) -> bool:
+    normalized = question.lower()
+    return "compliance" in normalized and any(term in normalized for term in ("summary", "overview", "posture", "status"))
+
+
+def _compliance_summary_answer(summary: dict[str, object]) -> dict[str, object]:
+    frameworks = summary.get("frameworks", [])
+    framework_text = "; ".join(
+        f"{item['framework']}: {item['mapped_findings']} mapped ({item['coverage_percent']}% of findings)"
+        for item in frameworks
+    )
+    total = summary.get("total_findings", 0)
+    unmapped = summary.get("unmapped_findings", 0)
+    return {
+        "answer": f"Compliance summary: {total} finding(s) are currently tracked, with {unmapped} finding(s) unmapped. Framework coverage is {framework_text or 'not available because no findings are currently loaded.'} These are query-time evidence-based mappings from finding data, not proof of completed audit compliance.",
+        "groundedIn": [
+            f"Compliance summary: {total} total findings",
+            f"Compliance summary: {unmapped} unmapped findings",
+            *[f"{item['framework']}: {item['mapped_findings']} mapped findings ({item['coverage_percent']}%)" for item in frameworks],
+        ],
+    }
+
+
 @app.post("/api/assistant/query")
 def assistant_query(payload: AssistantQueryRequest) -> dict[str, object]:
     api_key = os.getenv("OPENROUTER_API_KEY", "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key or api_key in {"your-key-here", "your-openrouter-key-here"}:
         raise HTTPException(status_code=503, detail="AI assistant not configured")
     context = _assistant_context()
+    compliance_rows = _compliance_rows()
+    compliance_total = len(compliance_rows)
+    compliance_frameworks = []
+    for framework in COMPLIANCE_FRAMEWORKS:
+        mapped = sum(1 for row in compliance_rows if any(mapping["framework"] == framework for mapping in row["mappings"]))
+        compliance_frameworks.append({
+            "framework": framework,
+            "mapped_findings": mapped,
+            "coverage_percent": round(mapped / compliance_total * 100, 1) if compliance_total else 0,
+        })
+    context["compliance"] = {
+        "summary": {
+            "total_findings": compliance_total,
+            "unmapped_findings": sum(1 for row in compliance_rows if any(mapping["framework"] == "Unmapped" for mapping in row["mappings"])),
+            "frameworks": compliance_frameworks,
+        },
+        "finding_mappings": compliance_rows,
+        "mapping_note": "Mappings are computed at query time from finding source/title rules, then CWE fallback when a CWE is available. Unmapped means no supported evidence matched.",
+    }
+    if payload.mode == "ask" and _is_compliance_summary_question(payload.question):
+        return _compliance_summary_answer(context["compliance"]["summary"])
     if payload.mode == "simulate":
         scenario = payload.scenario
         if scenario and scenario.type in {"enforce_mfa", "delay_remediation"}:
@@ -230,14 +275,57 @@ def assistant_query(payload: AssistantQueryRequest) -> dict[str, object]:
         return _simulate_scenario(context, scenario.type if scenario else "free_text", scenario_params)
 
     result = _assistant_json_completion([
-        {"role": "system", "content": "You are CyberRobo, a helpful cybersecurity and financial cyber-risk assistant. Answer general cybersecurity, IAM, vulnerability, controls, and risk-management questions using your general knowledge. For definitions, acronyms, and concept questions such as 'What is EPSS?', answer the definition directly and concisely from general knowledge first; do not refuse or lead with missing dashboard data. When a question asks about this organization's specific assets, findings, controls, coverage, or risk scores, use only the supplied CyberFinGuard data context: cite the specific figures used, say 'not yet calculated' for pending or missing risk_scores values, and never invent organization-specific numbers. If a question mixes general and organization-specific parts, answer the general part and clearly label any organization-specific limitation. For IAM questions, use iam_setup_status and assets_by_type: explain that missing IAM representation means identity-access coverage cannot be verified, and distinguish that dataset limitation from proof that every IAM control is absent. Return JSON with answer and groundedIn, where groundedIn is an array of the data points or general knowledge basis actually used."},
+        {"role": "system", "content": "You are CyberRobo, a helpful cybersecurity, compliance, and financial cyber-risk assistant. Answer general questions about ISO 27001, NIST CSF, CIS Controls, RBI CSCF, SEBI CSCRF, IAM, vulnerabilities, controls, audits, evidence, and risk management using your general knowledge. For definitions, acronyms, and concept questions, answer directly and concisely from general knowledge first; do not refuse or lead with missing dashboard data. For this organization's compliance questions, use the supplied compliance summary and finding_mappings: cite framework coverage, mapped/unmapped counts, finding titles, severity, control IDs, and match methods when relevant. Explain that query-time source/title mappings and CWE fallback are evidence-based mappings, not proof of audit compliance. When a question asks about this organization's specific assets, findings, controls, coverage, or risk scores, use only the supplied CyberFinGuard data context: cite the specific figures used, say 'not yet calculated' for pending or missing risk_scores values, and never invent organization-specific numbers. If a question mixes general and organization-specific parts, answer the general part and clearly label any organization-specific limitation. For IAM questions, use iam_setup_status and assets_by_type: explain that missing IAM representation means identity-access coverage cannot be verified, and distinguish that dataset limitation from proof that every IAM control is absent. Return JSON with answer and groundedIn, where groundedIn is an array of the data points or general knowledge basis actually used."},
         {"role": "user", "content": json.dumps({"data_context": context, "question": payload.question}, default=str)},
     ])
     answer = result.get("answer")
-    grounded_in = result.get("groundedIn")
-    if not isinstance(answer, str) or not isinstance(grounded_in, list) or not all(isinstance(item, str) for item in grounded_in):
+    grounded_in = result.get("groundedIn", result.get("grounded_in", []))
+    if isinstance(grounded_in, str):
+        grounded_in = [grounded_in]
+    elif isinstance(grounded_in, list):
+        grounded_in = [item if isinstance(item, str) else json.dumps(item, default=str) for item in grounded_in]
+    else:
+        grounded_in = []
+    if not isinstance(answer, str) or not answer.strip():
         raise HTTPException(status_code=502, detail="AI provider returned an invalid assistant response")
     return {"answer": answer, "groundedIn": grounded_in}
+
+
+COMPLIANCE_FRAMEWORKS = ("ISO 27001", "NIST CSF", "CIS Controls", "RBI CSCF", "SEBI CSCRF")
+
+
+def _compliance_rows() -> list[dict[str, object]]:
+    with db.connection() as connection:
+        findings = AssetRepository(connection).get_compliance_findings()
+    return [{
+        "finding_id": finding.get("finding_id"),
+        "title": finding.get("title") or "Untitled finding",
+        "severity": finding.get("severity") or "info",
+        "asset_id": finding.get("asset_id"),
+        "mappings": map_finding_to_frameworks(finding),
+    } for finding in findings]
+
+
+@app.get("/api/compliance/summary")
+def compliance_summary() -> dict[str, object]:
+    rows = _compliance_rows()
+    total = len(rows)
+    unmapped = sum(1 for row in rows if any(mapping["framework"] == "Unmapped" for mapping in row["mappings"]))
+    frameworks = []
+    for framework in COMPLIANCE_FRAMEWORKS:
+        mapped = sum(1 for row in rows if any(mapping["framework"] == framework for mapping in row["mappings"]))
+        frameworks.append({
+            "framework": framework,
+            "mapped_findings": mapped,
+            "coverage_percent": round(mapped / total * 100, 1) if total else 0,
+        })
+    return {"total_findings": total, "unmapped_findings": unmapped, "frameworks": frameworks}
+
+
+@app.get("/api/compliance/findings")
+def compliance_findings() -> dict[str, object]:
+    rows = _compliance_rows()
+    return {"findings": rows, "total_findings": len(rows)}
 
 
 @app.post("/api/assets/website", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)

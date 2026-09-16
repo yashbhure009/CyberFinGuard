@@ -161,6 +161,33 @@ export interface TechnicalDashboardSummary {
   mfa_edr_coverage_percent: number;
 }
 
+export interface ComplianceFrameworkSummary {
+  framework: "ISO 27001" | "NIST CSF" | "CIS Controls" | "RBI CSCF" | "SEBI CSCRF";
+  mapped_findings: number;
+  coverage_percent: number;
+}
+
+export interface ComplianceSummary {
+  total_findings: number;
+  unmapped_findings: number;
+  frameworks: ComplianceFrameworkSummary[];
+}
+
+export interface ComplianceMapping {
+  framework: string;
+  control_id: string | null;
+  match_method: "source_title_rule" | "cwe_fallback" | "unmapped";
+  confidence: "high" | "medium" | "none";
+}
+
+export interface ComplianceFindingMapping {
+  finding_id: string;
+  title: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  asset_id: string | null;
+  mappings: ComplianceMapping[];
+}
+
 export interface TechnicalFindingDetail {
   finding_id: string; // findings.finding_id
   asset_id: string; // findings.asset_id -> assets.asset_id

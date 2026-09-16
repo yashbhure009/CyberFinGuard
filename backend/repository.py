@@ -164,3 +164,13 @@ class AssetRepository:
             "risk_score_status": "Real values are shown where populated; missing risk_scores fields are Pending and must not be estimated.",
             "pending_risk_fields": pending_risk_fields,
         }
+
+    def get_compliance_findings(self) -> list[dict[str, Any]]:
+        """Read canonical finding fields used by the query-time compliance mapper."""
+        with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("""
+                SELECT finding_id, title, severity, asset_id, source, raw_data
+                FROM findings
+                ORDER BY created_at DESC, finding_id
+            """)
+            return [dict(row) for row in cursor.fetchall()]

@@ -1,6 +1,7 @@
 import logging
 import os
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterator
 
 import psycopg2
@@ -8,7 +9,7 @@ from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool
 
-load_dotenv()
+load_dotenv(Path(__file__).with_name(".env"))
 logger = logging.getLogger(__name__)
 
 class DatabaseUnavailableError(RuntimeError):

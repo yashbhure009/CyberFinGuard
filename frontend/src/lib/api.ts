@@ -12,6 +12,8 @@ import type {
   TechnicalDashboardSummary,
   TechnicalFindingRow,
   AIRecommendation,
+  ComplianceSummary,
+  ComplianceFindingMapping,
 } from "@/types";
 
 const wait = (milliseconds = 450) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -125,4 +127,12 @@ export type AssistantSimulationResponse = {
 
 export async function queryAssistant(mode: AssistantMode, payload: Omit<AssistantQueryPayload, "mode">): Promise<AssistantAskResponse | AssistantSimulationResponse> {
   return request(`/api/assistant/query`, { method: "POST", body: JSON.stringify({ mode, ...payload }) });
+}
+
+export async function getComplianceSummary(): Promise<ComplianceSummary> {
+  return request("/api/compliance/summary");
+}
+
+export async function getComplianceFindings(): Promise<{ findings: ComplianceFindingMapping[]; total_findings: number }> {
+  return request("/api/compliance/findings");
 }
