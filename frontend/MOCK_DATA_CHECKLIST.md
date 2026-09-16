@@ -1,5 +1,18 @@
 # Technical dashboard mock-data checklist
 
+## Executive Dashboard
+
+- `src/lib/mock/executive-dashboard.ts` — asset-level ALE, asset value, and recommendation records used by the Executive Dashboard; these stand in for risk_scores and investment_recommendations until the risk engine is populated.
+- `src/hooks/use-executive-dashboard.ts` — combines executive mock financial records with the real `GET /api/compliance/summary` response; compliance coverage is not mock data.
+- `src/components/executive/executive-dashboard.tsx` — six visualizations aggregate executive mock records; the compliance coverage chart consumes the real compliance summary.
+- `src/app/dashboard/executive/page.tsx` — financial KPIs/charts are mock-backed and compliance coverage is live when PostgreSQL/API access is available.
+
+## Compliance and AI status
+
+- `src/hooks/use-compliance.ts` and `src/components/compliance/compliance-view.tsx` — compliance view is real DB-backed through `/api/compliance/summary` and `/api/compliance/findings`; it has no frontend compliance mock fallback.
+- `src/hooks/use-risk-analysis.ts` — AI recommendation requests fall back silently to `src/lib/mock/risk-analysis.ts` when the backend/OpenRouter request fails; the UI labels the resulting source as mock.
+- `src/components/chat/assistant-widget.tsx` — Ask and Simulate use the backend assistant endpoint; no frontend mock answer fallback exists.
+
 Replace these mock or placeholder sources when the real integrations are ready:
 
 - `src/lib/mock/technical-dashboard.ts` — `technicalFindingSeeds`, `joinedAssetData`, and `technicalSummary` are static findings, asset joins, and KPI calculations. Replace with normalized findings and joined asset/risk data from `GET /api/dashboard/technical`, populated by the findings, assets, controls, and `risk_scores` tables.

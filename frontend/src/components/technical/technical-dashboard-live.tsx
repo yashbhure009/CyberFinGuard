@@ -7,6 +7,7 @@ import { VulnerabilityTrendChart } from "@/components/technical/charts/vulnerabi
 import { FindingsBySeverityChart } from "@/components/technical/charts/findings-by-severity-chart";
 import { CvssEpssScatterChart } from "@/components/technical/charts/cvss-epss-scatter-chart";
 import { EmergingRiskTrendChart } from "@/components/technical/charts/emerging-risk-trend-chart";
+import { weightedRiskScore } from "@/lib/technical-dashboard/weighted-risk";
 
 function AnimatedKpiValue({
   value,
@@ -48,17 +49,25 @@ export function TechnicalDashboardLive() {
   const [severity, setSeverity] = useState("all");
   const [source, setSource] = useState("all");
   const [patch, setPatch] = useState("all");
+  const [assetId, setAssetId] = useState("all");
+  const [sortBy, setSortBy] = useState<"default" | "weightedRisk">("default");
   const [selected, setSelected] = useState<TechnicalFindingRow | null>(null);
+  useEffect(() => {
+    const requestedAssetId = new URLSearchParams(window.location.search).get("assetId");
+    if (requestedAssetId) setAssetId(requestedAssetId);
+  }, []);
   const filtered = useMemo(
     () =>
       findings.filter(
         (finding) =>
           (severity === "all" || finding.severity === severity) &&
           (source === "all" || finding.source === source) &&
-          (patch === "all" || finding.patching_status === patch),
+          (patch === "all" || finding.patching_status === patch) &&
+          (assetId === "all" || finding.asset_id === assetId),
       ),
-    [findings, severity, source, patch],
+    [findings, severity, source, patch, assetId],
   );
+  const displayedFindings = useMemo(() => sortBy === "default" ? filtered : [...filtered].sort((a, b) => weightedRiskScore(b) - weightedRiskScore(a)), [filtered, sortBy]);
   const kpis = [
     ["Total findings", summary.total_findings],
     ["Critical", summary.critical_findings],
@@ -185,6 +194,10 @@ export function TechnicalDashboardLive() {
             <option value="unpatched">Unpatched</option>
           </select>
         </label>
+        <label>
+          Sort
+          <select value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}><option value="default">Default</option><option value="weightedRisk">Weighted risk</option></select>
+        </label>
         <span className="filter-count">{filtered.length} findings</span>
       </div>
       {error && <p className="error-text">{error}</p>}
@@ -216,13 +229,14 @@ export function TechnicalDashboardLive() {
                     "Patch",
                     "Severity",
                     "Likelihood",
+                    "Weighted Risk",
                   ].map((heading) => (
                     <th key={heading}>{heading}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((finding) => (
+                {displayedFindings.map((finding) => (
                   <tr
                     key={finding.finding_id}
                     onClick={() => setSelected(finding)}
@@ -243,6 +257,7 @@ export function TechnicalDashboardLive() {
                       </span>
                     </td>
                     <td>{finding.likelihood_score?.toFixed(2) ?? "Pending"}</td>
+                    <td>{weightedRiskScore(finding).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

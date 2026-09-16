@@ -123,6 +123,7 @@ export interface TechnicalFindingRow {
   asset_name: string; // assets.asset_name
   asset_type: string; // assets.asset_type
   business_unit: string | null; // assets.business_unit
+  dependencies?: string[]; // assets.dependencies
   criticality: number | null; // assets.criticality
   asset_value: number | null; // assets.asset_value
   internet_exposed: boolean; // assets.internet_exposed
@@ -171,6 +172,27 @@ export interface ComplianceSummary {
   total_findings: number;
   unmapped_findings: number;
   frameworks: ComplianceFrameworkSummary[];
+}
+
+export interface AssetFinancialExposure {
+  asset_id: string;
+  asset_name: string;
+  business_unit: string;
+  criticality: number;
+  ale: number;
+  asset_value: number;
+  likelihood_score: number;
+  impact_score: number;
+}
+
+export interface ExecutiveDashboardSummary {
+  total_ale: number;
+  total_estimated_var: number;
+  total_recommended_investment: number;
+  average_roi: number;
+  critical_assets: number;
+  compliance_coverage_percent: number | null;
+  enterprise_risk_score: number | null;
 }
 
 export interface ComplianceMapping {
