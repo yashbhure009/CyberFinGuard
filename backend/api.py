@@ -1,10 +1,11 @@
 """
 CyberFinGuard — FastAPI Backend
-Exposes ingestion + risk data to frontend
+Frontend se input lene ke liye
 """
 
 import os
 import sys
+import json
 import logging
 from datetime import datetime
 from typing import Optional
@@ -14,8 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+# Path setup
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from database import db
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -41,19 +42,16 @@ app.add_middleware(
 # ============================================================
 
 class ScanRequest(BaseModel):
-    target: str
+    target: str  # URL ya IP address
     scan_type: str = "quick"  # quick, full
-    sources: list = ["zap", "nmap", "nuclei"]
+    sources: list = ["zap", "nmap", "nuclei"]  # kaunse tools chalane hain
 
 
-class FindingResponse(BaseModel):
-    finding_id: str
-    asset_id: str
-    source: str
-    title: str
-    severity: str
-    cve_id: Optional[str] = None
-    cvss_score: Optional[float] = None
+class ScanResponse(BaseModel):
+    status: str
+    target: str
+    findings_count: int
+    findings: list
 
 
 # ============================================================
@@ -62,58 +60,100 @@ class FindingResponse(BaseModel):
 
 @app.get("/")
 def root():
-    return {"status": "ok", "service": "CyberFinGuard API"}
+    return {
+        "status": "ok",
+        "service": "CyberFinGuard API",
+        "version": "1.0.0"
+    }
 
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat()
+    }
 
 
 @app.post("/scan")
 def start_scan(request: ScanRequest):
-    """Frontend se scan trigger karo"""
+    """
+    Frontend se scan trigger karo
+    Input: {target: "https://example.com"}
+    """
     logger.info(f"🚀 Scan request: {request.target} | Type: {request.scan_type}")
+    
+    # Validate target
+    if not request.target:
+        raise HTTPException(status_code=400, detail="Target is required")
+    
+    target = request.target.strip()
     
     results = {}
     
-    # ZAP scan
+    # 1. ZAP Scan
     if "zap" in request.sources:
         try:
+            logger.info("🕷️ Running ZAP...")
             from ingestion.zap_ingestor import ZAPIngestor
             zap = ZAPIngestor()
-            results["zap"] = zap.run(target_url=request.target)
+            results["zap"] = zap.run(target_url=target)
         except Exception as e:
+            logger.error(f"❌ ZAP failed: {e}")
             results["zap"] = {"error": str(e)}
     
-    # Nmap scan
+    # 2. Nmap Scan
     if "nmap" in request.sources:
         try:
+            logger.info("🔍 Running Nmap...")
             from ingestion.nmap_ingestor import NmapIngestor
             nmap = NmapIngestor()
-            results["nmap"] = nmap.run(target=request.target)
+            # IP nikalo URL se
+            nmap_target = target.replace("https://", "").replace("http://", "").split("/")[0]
+            results["nmap"] = nmap.run(target=nmap_target)
         except Exception as e:
+            logger.error(f"❌ Nmap failed: {e}")
             results["nmap"] = {"error": str(e)}
     
-    # Nuclei scan
+    # 3. Nuclei Scan
     if "nuclei" in request.sources:
         try:
+            logger.info("🎯 Running Nuclei...")
             from ingestion.nuclei_ingestor import NucleiIngestor
             nuclei = NucleiIngestor()
-            results["nuclei"] = nuclei.run(target=request.target)
+            results["nuclei"] = nuclei.run(target=target)
         except Exception as e:
+            logger.error(f"❌ Nuclei failed: {e}")
             results["nuclei"] = {"error": str(e)}
+    
+    # 4. Threat Intel Enrichment
+    try:
+        logger.info("🛡️ Running Threat Intel...")
+        from Enrichment.threat_intel import ThreatIntelEnricher
+        enricher = ThreatIntelEnricher()
+        results["threat_intel"] = enricher.enrich_database_findings()
+    except Exception as e:
+        logger.error(f"❌ Threat Intel failed: {e}")
+        results["threat_intel"] = {"error": str(e)}
+    
+    # Get findings count
+    from database import db
+    findings = db.execute_query("SELECT * FROM findings ORDER BY created_at DESC LIMIT 50")
     
     return {
         "status": "completed",
-        "target": request.target,
-        "results": results
+        "target": target,
+        "findings_count": len(findings),
+        "results": results,
+        "findings": findings
     }
 
 
 @app.get("/findings")
 def get_findings(source: Optional[str] = None, limit: int = 100):
     """Sab findings laao"""
+    from database import db
+    
     query = "SELECT * FROM findings"
     params = []
     
@@ -125,19 +165,28 @@ def get_findings(source: Optional[str] = None, limit: int = 100):
     params.append(limit)
     
     findings = db.execute_query(query, tuple(params))
-    return {"count": len(findings), "findings": findings}
+    return {
+        "count": len(findings),
+        "findings": findings
+    }
 
 
 @app.get("/assets")
 def get_assets():
     """Sab assets laao"""
+    from database import db
     assets = db.execute_query("SELECT * FROM assets ORDER BY asset_name")
-    return {"count": len(assets), "assets": assets}
+    return {
+        "count": len(assets),
+        "assets": assets
+    }
 
 
 @app.get("/risk-summary")
 def get_risk_summary():
     """Risk summary — frontend dashboard ke liye"""
+    from database import db
+    
     findings = db.execute_query("SELECT * FROM findings")
     assets = db.execute_query("SELECT * FROM assets")
     
@@ -154,8 +203,8 @@ def get_risk_summary():
                 asset_value = float(asset.get('asset_value') or 10000000)
                 break
         
-        sle = asset_value * (cvss / 10)
-        aro = 0.5 if cvss > 7 else 0.2
+        sle = asset_value * (float(cvss) / 10)
+        aro = 0.5 if float(cvss) > 7 else 0.2
         total_risk += sle * aro
     
     # Findings by severity
@@ -183,6 +232,7 @@ def get_risk_summary():
 @app.get("/stats")
 def get_stats():
     """Quick stats"""
+    from database import db
     findings = db.execute_query("SELECT COUNT(*) as count FROM findings")
     assets = db.execute_query("SELECT COUNT(*) as count FROM assets")
     

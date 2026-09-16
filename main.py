@@ -9,7 +9,13 @@ import json
 import logging
 from datetime import datetime
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+# ============================================================
+# PATH SETUP
+# ============================================================
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.join(ROOT_DIR, 'backend')
+sys.path.insert(0, ROOT_DIR)
+sys.path.insert(0, BACKEND_DIR)
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -21,9 +27,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Output directory
-OUTPUT_DIR = 'data/unified_findings'
+OUTPUT_DIR = os.getenv('UNIFIED_OUTPUT_DIR', 'data/unified_findings')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
+def parse_raw_data(raw):
+    """Safely parse raw_data (can be str, dict, or None)"""
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return {"raw": raw}
+    return {}
 
 
 # ============================================================
@@ -171,38 +194,28 @@ def fetch_unified_findings():
     unified = []
     for f in findings:
         finding = {
-            # ============================================================
-            # CORE IDENTIFIERS (same format everywhere)
-            # ============================================================
+            # CORE IDENTIFIERS
             "finding_id": f['finding_id'],
             "asset_id": f['asset_id'],
             "source": f['source'],
             "severity": f['severity'],
             
-            # ============================================================
             # FINDING DETAILS
-            # ============================================================
             "title": f['title'],
             "description": f['description'],
             
-            # ============================================================
             # THREAT INTEL
-            # ============================================================
             "cve_id": f['cve_id'],
             "cvss_score": float(f['cvss_score']) if f['cvss_score'] else None,
             "epss_score": float(f['epss_score']) if f['epss_score'] else None,
             "cisa_kev": bool(f['cisa_kev']),
             
-            # ============================================================
             # MITRE
-            # ============================================================
             "mitre_technique": f['mitre_technique'],
             
-            # ============================================================
             # METADATA
-            # ============================================================
             "timestamp": f['created_at'].isoformat() if f['created_at'] else None,
-            "detail": json.loads(f['raw_data']) if f['raw_data'] else {},
+            "detail": parse_raw_data(f['raw_data']),
             "framework_tags": []
         }
         unified.append(finding)
@@ -241,12 +254,12 @@ def save_unified_output(findings):
     
     # Save latest
     latest_file = os.path.join(OUTPUT_DIR, 'latest.json')
-    with open(latest_file, 'w') as fp:
+    with open(latest_file, 'w', encoding='utf-8') as fp:
         json.dump(output, fp, indent=2, default=str)
     
     # Save timestamped
     timestamped_file = os.path.join(OUTPUT_DIR, f'findings_{timestamp}.json')
-    with open(timestamped_file, 'w') as fp:
+    with open(timestamped_file, 'w', encoding='utf-8') as fp:
         json.dump(output, fp, indent=2, default=str)
     
     logger.info(f"✅ Saved: {latest_file}")
@@ -268,17 +281,23 @@ def main(target_url=None):
     
     results = {}
     
-    # 1. Local scan tools
+    # ============================================================
+    # 1. LOCAL SCAN TOOLS
+    # ============================================================
     results['zap'] = run_zap(target=target_url)
     results['nmap'] = run_nmap(target='scanme.nmap.org')
     results['nuclei'] = run_nuclei(target=target_url or 'https://httpbin.org')
     
-    # 2. Teammates' tools
+    # ============================================================
+    # 2. TEAMMATES' TOOLS (Uncomment if accessible)
+    # ============================================================
     results['wazuh'] = run_wazuh()
     results['prowler'] = run_prowler()
     results['keycloak'] = run_keycloak()
     
-    # 3. Enrichment
+    # ============================================================
+    # 3. ENRICHMENT
+    # ============================================================
     results['threat_intel'] = run_threat_intel_enricher()
     
     # ============================================================

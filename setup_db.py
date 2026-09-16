@@ -3,24 +3,35 @@ DATABASE SETUP SCRIPT - CyberFinGuard
 Run this file once to set up the entire database
 """
 
+import sys
+import io
+import os
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-import os
+from dotenv import load_dotenv
 
 # ============================================================
-# CONFIGURATION
+# FIX UNICODE ENCODING FOR WINDOWS
 # ============================================================
-DB_HOST = 'localhost'
-DB_NAME = 'cyber_risk_db'
-DB_USER = 'postgres'
-DB_PASSWORD = 'postgres'
-DB_PORT = '5432'
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+# ============================================================
+# LOAD ENVIRONMENT VARIABLES
+# ============================================================
+load_dotenv()
+
+DB_HOST = os.getenv('DB_HOST', 'localhost')
+DB_NAME = os.getenv('DB_NAME', 'cyber_risk_db')
+DB_USER = os.getenv('DB_USER', 'postgres')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'postgres')
+DB_PORT = os.getenv('DB_PORT', '5432')
 
 # ============================================================
 # SQL SCHEMA
 # ============================================================
 CREATE_TABLES_SQL = """
-
 -- 1. ASSETS TABLE
 CREATE TABLE IF NOT EXISTS assets (
     asset_id VARCHAR(50) PRIMARY KEY,
@@ -100,21 +111,85 @@ CREATE TABLE IF NOT EXISTS investment_recommendations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. INDEXES
+-- 6. KEYCLOAK IAM TABLES
+CREATE TABLE IF NOT EXISTS iam_users (
+    user_id VARCHAR(100) PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    first_name VARCHAR(255),
+    last_name VARCHAR(255),
+    email VARCHAR(255),
+    email_verified BOOLEAN DEFAULT FALSE,
+    enabled BOOLEAN DEFAULT FALSE,
+    mfa_enabled BOOLEAN DEFAULT FALSE,
+    last_seen_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS iam_roles (
+    role_id VARCHAR(100) PRIMARY KEY,
+    role_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS iam_groups (
+    group_id VARCHAR(100) PRIMARY KEY,
+    group_name VARCHAR(255) NOT NULL,
+    group_path VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS iam_user_roles (
+    user_id VARCHAR(100) REFERENCES iam_users(user_id) ON DELETE CASCADE,
+    role_id VARCHAR(100) REFERENCES iam_roles(role_id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, role_id)
+);
+
+CREATE TABLE IF NOT EXISTS iam_user_groups (
+    user_id VARCHAR(100) REFERENCES iam_users(user_id) ON DELETE CASCADE,
+    group_id VARCHAR(100) REFERENCES iam_groups(group_id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, group_id)
+);
+
+CREATE TABLE IF NOT EXISTS iam_authentication_events (
+    event_id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(100) REFERENCES iam_users(user_id) ON DELETE SET NULL,
+    event_type VARCHAR(100),
+    event_time BIGINT,
+    event_timestamp TIMESTAMP,
+    realm_id VARCHAR(100),
+    client_id VARCHAR(255),
+    session_id VARCHAR(255),
+    ip_address VARCHAR(45),
+    details JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 7. INDEXES
 CREATE INDEX IF NOT EXISTS idx_findings_asset ON findings(asset_id);
 CREATE INDEX IF NOT EXISTS idx_findings_cve ON findings(cve_id);
 CREATE INDEX IF NOT EXISTS idx_findings_source ON findings(source);
 CREATE INDEX IF NOT EXISTS idx_risk_asset ON risk_scores(asset_id);
 CREATE INDEX IF NOT EXISTS idx_assets_environment ON assets(environment);
 CREATE INDEX IF NOT EXISTS idx_assets_criticality ON assets(criticality);
-
+CREATE INDEX IF NOT EXISTS idx_iam_users_username ON iam_users(username);
+CREATE INDEX IF NOT EXISTS idx_iam_users_email ON iam_users(email);
+CREATE INDEX IF NOT EXISTS idx_iam_users_mfa ON iam_users(mfa_enabled);
+CREATE INDEX IF NOT EXISTS idx_iam_roles_name ON iam_roles(role_name);
+CREATE INDEX IF NOT EXISTS idx_iam_groups_name ON iam_groups(group_name);
+CREATE INDEX IF NOT EXISTS idx_iam_events_user ON iam_authentication_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_iam_events_type ON iam_authentication_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_iam_events_time ON iam_authentication_events(event_time);
+CREATE INDEX IF NOT EXISTS idx_iam_events_client ON iam_authentication_events(client_id);
 """
 
 # ============================================================
 # SAMPLE DATA
 # ============================================================
 SAMPLE_DATA_SQL = """
-
 -- Sample Assets
 INSERT INTO assets (asset_id, asset_name, asset_type, ip_address, hostname, environment, production_status, criticality, asset_value)
 VALUES 
@@ -152,64 +227,67 @@ VALUES
     ('RSK-002', 'AST-002', 'FND-002', 37500000, 0.42, 15750000),
     ('RSK-003', 'AST-001', 'FND-003', 2000000, 0.15, 300000)
 ON CONFLICT (risk_id) DO NOTHING;
-
 """
 
 # ============================================================
-# MAIN SETUP FUNCTION
+# FUNCTIONS
 # ============================================================
+
+def test_connection():
+    """Test database connection"""
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST, database=DB_NAME, user=DB_USER,
+            password=DB_PASSWORD, port=DB_PORT
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT version()")
+        version = cursor.fetchone()[0]
+        print(f"[OK] Connected to PostgreSQL: {version[:40]}...")
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[ERROR] Connection failed: {e}")
+        return False
+
 
 def create_database():
     """Create database if it doesn't exist"""
     try:
         conn = psycopg2.connect(
-            host=DB_HOST,
-            database='postgres',
-            user=DB_USER,
-            password=DB_PASSWORD,
-            port=DB_PORT
+            host=DB_HOST, database='postgres', user=DB_USER,
+            password=DB_PASSWORD, port=DB_PORT
         )
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cursor = conn.cursor()
-        
         cursor.execute(f"SELECT 1 FROM pg_database WHERE datname = '{DB_NAME}'")
         exists = cursor.fetchone()
-        
         if not exists:
             cursor.execute(f"CREATE DATABASE {DB_NAME}")
-            print(f"✅ Database '{DB_NAME}' created successfully!")
+            print(f"[OK] Database '{DB_NAME}' created!")
         else:
-            print(f"ℹ️ Database '{DB_NAME}' already exists.")
-        
+            print(f"[INFO] Database '{DB_NAME}' already exists.")
         cursor.close()
         conn.close()
         return True
-        
     except Exception as e:
-        print(f"❌ Failed to create database: {e}")
-        print("\n💡 Make sure PostgreSQL is installed and running!")
-        print("   Download from: https://www.postgresql.org/download/windows/")
+        print(f"[ERROR] Failed to create database: {e}")
         return False
+
 
 def create_tables():
     """Create all tables in the database"""
     try:
         conn = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            port=DB_PORT
+            host=DB_HOST, database=DB_NAME, user=DB_USER,
+            password=DB_PASSWORD, port=DB_PORT
         )
         cursor = conn.cursor()
-        
-        # Execute schema
         cursor.execute(CREATE_TABLES_SQL)
         conn.commit()
+        print("[OK] All tables created successfully!")
         
-        print("✅ All tables created successfully!")
-        
-        # Show tables
         cursor.execute("""
             SELECT table_name 
             FROM information_schema.tables 
@@ -217,91 +295,73 @@ def create_tables():
             ORDER BY table_name
         """)
         tables = cursor.fetchall()
-        print("\n📊 Tables in database:")
+        print("\nTables in database:")
         for table in tables:
             print(f"   - {table[0]}")
         cursor.close()
         conn.close()
         return True
     except Exception as e:
-        print(f"❌ Failed to create tables: {e}")
+        print(f"[ERROR] Failed to create tables: {e}")
         return False
+
+
 def insert_sample_data():
     """Insert sample data for testing"""
     try:
         conn = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            port=DB_PORT
+            host=DB_HOST, database=DB_NAME, user=DB_USER,
+            password=DB_PASSWORD, port=DB_PORT
         )
         cursor = conn.cursor()
         cursor.execute(SAMPLE_DATA_SQL)
         conn.commit()
-        print("✅ Sample data inserted successfully!")
-        # Show counts
+        print("[OK] Sample data inserted successfully!")
+        
         cursor.execute("SELECT COUNT(*) FROM assets")
         assets_count = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM findings")
         findings_count = cursor.fetchone()[0]
-        print(f"\n📊 Data counts:")
+        print(f"\nData counts:")
         print(f"   - Assets: {assets_count}")
         print(f"   - Findings: {findings_count}")
         cursor.close()
         conn.close()
         return True
     except Exception as e:
-        print(f"❌ Failed to insert sample data: {e}")
+        print(f"[ERROR] Failed to insert sample data: {e}")
         return False
-def test_connection():
-    """Test database connection"""
-    try:
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            port=DB_PORT
-        )
-        cursor = conn.cursor()
-        cursor.execute("SELECT version()")
-        version = cursor.fetchone()[0]
-        print(f"✅ Connected to PostgreSQL: {version[:30]}...")
-        cursor.close()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Connection failed: {e}")
-        return False
+
+
 # ============================================================
 # MAIN
 # ============================================================
 if __name__ == "__main__":
     print("=" * 60)
-    print("🚀 CyberFinGuard - Database Setup")
+    print("CyberFinGuard - Database Setup")
     print("=" * 60)
-    # Test connection first
-    print("\n🔍 Testing PostgreSQL connection...")
+    
+    print("\n[1/4] Testing PostgreSQL connection...")
     if not test_connection():
-        print("\n❌ PostgreSQL is not running!")
-        print("💡 Start PostgreSQL service:")
-        print("   net start postgresql-15")
-        print("   OR")
+        print("\n[ERROR] PostgreSQL is not running!")
+        print("Start PostgreSQL service:")
         print("   docker start postgres-risk")
-        exit(1)
-    # Setup
-    print("\n📦 Creating database...")
+        sys.exit(1)
+    
+    print("\n[2/4] Creating database...")
     if not create_database():
-        exit(1)
-    print("\n📦 Creating tables...")
+        sys.exit(1)
+    
+    print("\n[3/4] Creating tables...")
     if not create_tables():
-        exit(1)
-    print("\n📦 Inserting sample data...")
+        sys.exit(1)
+    
+    print("\n[4/4] Inserting sample data...")
     insert_sample_data()
+    
     print("\n" + "=" * 60)
-    print("🎉 Database setup complete!")
+    print("Database setup complete!")
     print("=" * 60)
-    print("\n💡 Next steps:")
+    print("\nNext steps:")
     print("   1. Run: python main.py")
     print("   2. Check data: SELECT * FROM assets;")
