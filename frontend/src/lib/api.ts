@@ -126,3 +126,34 @@ export type AssistantSimulationResponse = {
 export async function queryAssistant(mode: AssistantMode, payload: Omit<AssistantQueryPayload, "mode">): Promise<AssistantAskResponse | AssistantSimulationResponse> {
   return request(`/api/assistant/query`, { method: "POST", body: JSON.stringify({ mode, ...payload }) });
 }
+
+export interface IntegrationItem {
+  configured: boolean;
+  mode: string;
+}
+
+export interface IntegrationsResponse {
+  integrations: Record<string, IntegrationItem>;
+}
+
+export interface FindingsResponse {
+  count: number;
+  findings: TechnicalFindingRow[];
+}
+
+export async function getIntegrations(): Promise<IntegrationsResponse> {
+  return request("/api/integrations");
+}
+
+export async function collectIntegration(source: string): Promise<Record<string, unknown>> {
+  return request(`/api/integrations/${source}/collect`, { method: "POST" });
+}
+
+export async function runScan(target: string, sources?: string[]): Promise<Record<string, unknown>> {
+  return request("/api/scan", { method: "POST", body: JSON.stringify({ target, sources: sources || ["zap", "nmap", "nuclei"] }) });
+}
+
+export async function getFindings(source?: string, limit = 100): Promise<FindingsResponse> {
+  const query = source ? `?source=${encodeURIComponent(source)}&limit=${limit}` : `?limit=${limit}`;
+  return request(`/findings${query}`);
+}

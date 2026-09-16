@@ -235,14 +235,14 @@ export function TechnicalDashboardLive() {
                     <td>{finding.asset_name}</td>
                     <td>{finding.cve_id || "—"}</td>
                     <td>{finding.cvss_score ?? "—"}</td>
-                    <td>{finding.epss_score?.toFixed(2) ?? "—"}</td>
+                    <td>{finding.epss_score != null ? Number(finding.epss_score).toFixed(2) : "—"}</td>
                     <td>{finding.patching_status}</td>
                     <td>
                       <span className={`severity severity-${finding.severity}`}>
                         {finding.severity}
                       </span>
                     </td>
-                    <td>{finding.likelihood_score?.toFixed(2) ?? "Pending"}</td>
+                    <td>{finding.likelihood_score != null ? Number(finding.likelihood_score).toFixed(2) : "Pending"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -264,7 +264,7 @@ export function TechnicalDashboardLive() {
             <dt>CVE / CVSS / EPSS</dt>
             <dd>
               {selected.cve_id || "—"} · {selected.cvss_score ?? "—"} ·{" "}
-              {selected.epss_score?.toFixed(2) ?? "—"}
+              {selected.epss_score != null ? Number(selected.epss_score).toFixed(2) : "—"}
             </dd>
             <dt>CISA KEV / Exploit</dt>
             <dd>
@@ -284,11 +284,11 @@ export function TechnicalDashboardLive() {
             </dd>
             <dt>Risk calculation</dt>
             <dd>
-              {selected.likelihood_score === undefined ||
-              selected.impact_score === undefined ||
-              selected.ale === undefined
+              {selected.likelihood_score == null ||
+              selected.impact_score == null ||
+              selected.ale == null
                 ? "Pending risk calculation"
-                : `Likelihood ${selected.likelihood_score.toFixed(2)} · Impact ${selected.impact_score.toFixed(2)} · ALE ₹${selected.ale.toLocaleString("en-IN")}`}
+                : `Likelihood ${Number(selected.likelihood_score).toFixed(2)} · Impact ${Number(selected.impact_score).toFixed(2)} · ALE ₹${Number(selected.ale).toLocaleString("en-IN")}`}
             </dd>
           </dl>
         </aside>

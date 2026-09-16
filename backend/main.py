@@ -1,36 +1,76 @@
+import sys
 import os
 import json
 from collections.abc import Iterator
 from urllib.parse import urlparse
 
+# Path setup
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.database import DatabaseUnavailableError, db
-from backend.models import (
-    AssetResponse,
-    BusinessContextCreate,
-    CloudTargetCreate,
-    IAMTargetCreate,
-    NetworkTargetCreate,
-    WebsiteTargetCreate,
-    AIRecommendation,
-    RiskRecommendationsRequest,
-    AssistantQueryRequest,
-)
-from pydantic import TypeAdapter, ValidationError
-from backend.repository import AssetRepository
+try:
+    from backend.database import DatabaseUnavailableError, db
+    from backend.models import (
+        AssetResponse,
+        BusinessContextCreate,
+        CloudTargetCreate,
+        IAMTargetCreate,
+        NetworkTargetCreate,
+        WebsiteTargetCreate,
+        AIRecommendation,
+        RiskRecommendationsRequest,
+        AssistantQueryRequest,
+    )
+    from backend.repository import AssetRepository
+except ModuleNotFoundError:
+    from database import DatabaseUnavailableError, db
+    from models import (
+        AssetResponse,
+        BusinessContextCreate,
+        CloudTargetCreate,
+        IAMTargetCreate,
+        NetworkTargetCreate,
+        WebsiteTargetCreate,
+        AIRecommendation,
+        RiskRecommendationsRequest,
+        AssistantQueryRequest,
+    )
+    from repository import AssetRepository
 
 app = FastAPI(title="CyberFinGuard API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")],
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "service": "CyberFinGuard API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "endpoints": {
+            "health": "/health",
+            "integrations": "/api/integrations",
+            "findings": "/findings",
+            "technical_dashboard": "/api/dashboard/technical"
+        }
+    }
 
 
 def get_repository() -> Iterator[AssetRepository]:
@@ -56,9 +96,130 @@ def response(asset: dict, unmapped: list[str] | None = None) -> AssetResponse:
     return AssetResponse(**asset, unmapped_fields=unmapped or [])
 
 
+from pydantic import BaseModel, Field
+
+class ScanRequest(BaseModel):
+    target: str
+    scan_type: str = "quick"
+    sources: list[str] = Field(default_factory=lambda: ["zap", "nmap", "nuclei"])
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/integrations")
+@app.get("/api/integrations")
+def integration_status():
+    """Configuration status of supported security tools."""
+    from backend.ingestion.common import configured
+    return {
+        "integrations": {
+            "zap": {"configured": configured(os.getenv("ZAP_API_URL")), "mode": "api"},
+            "nmap": {"configured": bool(os.getenv("NMAP_PATH")), "mode": "local_cli"},
+            "nuclei": {"configured": bool(os.getenv("NUCLEI_PATH")), "mode": "local_cli"},
+            "wazuh": {"configured": all(configured(os.getenv(k)) for k in ("WAZUH_API_URL", "WAZUH_USERNAME", "WAZUH_PASSWORD")), "mode": "api"},
+            "prowler": {"configured": all(configured(os.getenv(k)) for k in ("KALI_HOST", "KALI_SSH_PASSWORD")), "mode": "ssh_cli"},
+            "keycloak": {"configured": all(configured(os.getenv(k)) for k in ("KEYCLOAK_URL", "KEYCLOAK_PASSWORD")), "mode": "admin_api"},
+            "threat_intel": {"configured": True, "mode": "public_api"},
+        }
+    }
+
+
+@app.post("/integrations/{source}/collect")
+@app.post("/api/integrations/{source}/collect")
+def collect_integration(source: str):
+    """Run non-targeted collection for wazuh, prowler, keycloak, threat_intel."""
+    valid_sources = {"wazuh", "prowler", "keycloak", "threat_intel"}
+    if source not in valid_sources:
+        raise HTTPException(status_code=400, detail=f"Invalid integration '{source}'. Must be one of {valid_sources}")
+    try:
+        if source == "threat_intel":
+            from backend.Enrichment.threat_intel import ThreatIntelEnricher
+            return {"source": source, "enriched": ThreatIntelEnricher().enrich_database_findings()}
+        elif source == "wazuh":
+            from backend.ingestion.wazuh_ingestor import WazuhIngestor
+            return WazuhIngestor().run()
+        elif source == "prowler":
+            from backend.ingestion.prowler_ingestor import ProwlerIngestor
+            return ProwlerIngestor().run()
+        elif source == "keycloak":
+            from backend.ingestion.keycloak_ingestor import KeycloakIngestor
+            return KeycloakIngestor().run()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"{source} collection failed: {exc}") from exc
+
+
+@app.post("/scan")
+@app.post("/api/scan")
+def start_scan(request: ScanRequest):
+    """Run ZAP, Nmap, or Nuclei scan against authorized target."""
+    target = (request.target or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="Target is required.")
+    
+    from backend.ingestion.common import require_authorized_target
+    try:
+        require_authorized_target(target)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    results = {}
+    if "zap" in request.sources:
+        from backend.ingestion.zap_ingestor import ZAPIngestor
+        results["zap"] = ZAPIngestor().run(target_url=target)
+    if "nmap" in request.sources:
+        from backend.ingestion.nmap_ingestor import NmapIngestor
+        results["nmap"] = NmapIngestor().run(target=target)
+    if "nuclei" in request.sources:
+        from backend.ingestion.nuclei_ingestor import NucleiIngestor
+        results["nuclei"] = NucleiIngestor().run(target=target)
+
+    with db.connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT COUNT(*) AS count FROM findings")
+            count = (cur.fetchone() or {}).get("count", 0)
+
+    return {
+        "status": "completed",
+        "target": target,
+        "findings_count": count,
+        "results": results
+    }
+
+
+@app.get("/findings")
+@app.get("/api/findings")
+def get_findings(source: str | None = None, severity: str | None = None, limit: int = 100):
+    """Fetch normalized findings from database."""
+    query = "SELECT * FROM findings"
+    params = []
+    conditions = []
+    if source:
+        conditions.append("source = %s")
+        params.append(source)
+    if severity:
+        conditions.append("severity = %s")
+        params.append(severity)
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " ORDER BY created_at DESC LIMIT %s"
+    params.append(min(max(limit, 1), 500))
+
+    with db.connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, tuple(params))
+            findings = [dict(r) for r in cur.fetchall()]
+
+    return {"count": len(findings), "findings": findings}
+
+
+@app.get("/api/dashboard/technical")
+@app.get("/dashboard/technical")
+def get_technical_dashboard(repository: AssetRepository = Depends(get_repository)):
+    """Return technical dashboard summary metrics and findings list."""
+    return repository.get_technical_dashboard()
 
 
 @app.post("/api/risk-analysis/recommendations")
@@ -240,6 +401,39 @@ def assistant_query(payload: AssistantQueryRequest) -> dict[str, object]:
     return {"answer": answer, "groundedIn": grounded_in}
 
 
+def _update_scan_config(target_url=None, cloud=None, identity=None, business=None):
+    scan_config_path = os.path.join(ROOT_DIR, 'scan_config.json')
+    current = {}
+    if os.path.exists(scan_config_path):
+        try:
+            with open(scan_config_path, 'r', encoding='utf-8') as fp:
+                current = json.load(fp)
+        except Exception:
+            current = {}
+    if target_url:
+        current['target_url'] = target_url
+    if cloud:
+        current['cloud'] = {**current.get('cloud', {}), **cloud}
+    if identity:
+        current['identity'] = {**current.get('identity', {}), **identity}
+    if business:
+        clean_biz = {}
+        for k, v in business.items():
+            if hasattr(v, 'as_tuple') or hasattr(v, '__float__'):
+                try:
+                    clean_biz[k] = float(v)
+                except (ValueError, TypeError):
+                    clean_biz[k] = str(v)
+            else:
+                clean_biz[k] = v
+        current['business'] = {**current.get('business', {}), **clean_biz}
+    try:
+        with open(scan_config_path, 'w', encoding='utf-8') as fp:
+            json.dump(current, fp, indent=2, default=str)
+    except Exception as exc:
+        logger.warning(f"Failed to save scan_config.json: {exc}")
+
+
 @app.post("/api/assets/website", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)
 def create_website(payload: WebsiteTargetCreate, repository: AssetRepository = Depends(get_repository)) -> AssetResponse:
     parsed = urlparse(str(payload.url))
@@ -251,6 +445,7 @@ def create_website(payload: WebsiteTargetCreate, repository: AssetRepository = D
         "internet_exposed": True,
         "production_status": "unknown",
     })
+    _update_scan_config(target_url=str(payload.url))
     return response(asset, ["url"])
 
 
@@ -278,6 +473,7 @@ def create_cloud(payload: CloudTargetCreate, repository: AssetRepository = Depen
         "internet_exposed": False,
         "production_status": "unknown",
     })
+    _update_scan_config(cloud={"provider": payload.provider, "fields": payload.fields})
     return response(asset, [f"fields.{key}" for key in payload.fields])
 
 
@@ -293,6 +489,7 @@ def create_iam(payload: IAMTargetCreate, repository: AssetRepository = Depends(g
         "internet_exposed": False,
         "production_status": "unknown",
     })
+    _update_scan_config(identity={"url": str(payload.url), "realm": payload.realm, "client_id": payload.client_id})
     return response(asset, ["url", "realm", "clientId", "clientSecret"])
 
 
@@ -310,6 +507,15 @@ def create_business_context(payload: BusinessContextCreate, repository: AssetRep
         "data_type": payload.data_sensitivity,
         "dependencies": [payload.service_dependency],
         "asset_value": payload.business_value,
+    })
+    _update_scan_config(business={
+        "asset_name": payload.asset_name,
+        "asset_type": payload.asset_type,
+        "business_unit": payload.business_unit,
+        "asset_owner": payload.asset_owner,
+        "business_value": payload.business_value,
+        "downtime_cost": payload.downtime_cost_per_hour,
+        "recovery_cost": payload.recovery_cost
     })
     return response(asset, [
         "operationalCriticality",

@@ -22,11 +22,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+try:
+    from ingestion.common import stable_id
+except ModuleNotFoundError:
+    from backend.ingestion.common import stable_id
+
+
 class ZAPIngestor:
     def __init__(self):
         self.zap_url = os.getenv('ZAP_API_URL', 'http://localhost:8080')
         self.api_key = os.getenv('ZAP_API_KEY', '')
-        self.target_url = os.getenv('ZAP_TARGET_URL', 'https://httpbin.org')
+        auth_targets = [t.strip() for t in os.getenv("AUTHORIZED_SCAN_TARGETS", "").split(",") if t.strip()]
+        self.target_url = os.getenv('ZAP_TARGET_URL', auth_targets[0] if auth_targets else 'https://httpbin.org')
         self.session = requests.Session()
 
     def _call(self, endpoint, params=None):
@@ -71,7 +78,7 @@ class ZAPIngestor:
         logger.warning("⚠️ No alerts found")
         return []
 
-    def normalize_alert(self, alert):
+    def normalize_alert(self, alert, target_url="target"):
         """Convert ZAP alert to unified schema"""
         risk_map = {
             "High": "critical",
@@ -80,10 +87,11 @@ class ZAPIngestor:
             "Informational": "low"
         }
         severity = risk_map.get(alert.get("risk", "Low"), "low")
+        asset_id = stable_id("zap", target_url)
         
         return {
             "finding_id": f"zap_{uuid.uuid4().hex[:8]}",
-            "asset_id": "httpbin_target",
+            "asset_id": asset_id,
             "source": "zap",
             "title": alert.get("name", "ZAP Finding"),
             "description": alert.get("description", ""),
@@ -117,7 +125,7 @@ class ZAPIngestor:
         count = 0
         for alert in alerts:
             try:
-                norm = self.normalize_alert(alert)
+                norm = self.normalize_alert(alert, target_url=target_url)
                 query = """
                     INSERT INTO findings (finding_id, asset_id, source, title, description, severity, raw_data)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)

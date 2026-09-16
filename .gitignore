@@ -18,7 +18,9 @@ venv/
 
 # Data
 data/*.json
+data/unified_findings/
 !data/sample_findings.json
+scan_config.json
 
 # Logs
 *.log

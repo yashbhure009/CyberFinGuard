@@ -164,3 +164,75 @@ class AssetRepository:
             "risk_score_status": "Real values are shown where populated; missing risk_scores fields are Pending and must not be estimated.",
             "pending_risk_fields": pending_risk_fields,
         }
+
+    def get_technical_dashboard(self) -> dict[str, Any]:
+        with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    f.finding_id,
+                    f.asset_id,
+                    COALESCE(a.asset_name, f.asset_id) AS asset_name,
+                    COALESCE(a.asset_type, 'service') AS asset_type,
+                    a.business_unit,
+                    a.criticality,
+                    a.asset_value,
+                    COALESCE(a.internet_exposed, FALSE) AS internet_exposed,
+                    a.environment,
+                    a.owner,
+                    a.production_status,
+                    f.source,
+                    f.cve_id,
+                    f.cvss_score,
+                    f.epss_score,
+                    COALESCE(f.cisa_kev, FALSE) AS cisa_kev,
+                    COALESCE(f.exploit_available, FALSE) AS exploit_available,
+                    f.exploit_type,
+                    f.mitre_technique,
+                    f.title,
+                    COALESCE(f.severity, 'info') AS severity,
+                    COALESCE(ac.patching_status, 'unknown') AS patching_status,
+                    COALESCE(ac.mfa_enabled, FALSE) AS mfa_enabled,
+                    COALESCE(ac.waf_enabled, FALSE) AS waf_enabled,
+                    COALESCE(ac.edr_enabled, FALSE) AS edr_enabled,
+                    COALESCE(ac.firewall_enabled, FALSE) AS firewall_enabled,
+                    COALESCE(ac.encryption_enabled, FALSE) AS encryption_enabled,
+                    COALESCE(ac.backup_exists, FALSE) AS backup_exists,
+                    rs.likelihood_score,
+                    rs.impact_score,
+                    rs.ale,
+                    f.created_at
+                FROM findings f
+                LEFT JOIN assets a ON f.asset_id = a.asset_id
+                LEFT JOIN asset_controls ac ON f.asset_id = ac.asset_id
+                LEFT JOIN risk_scores rs ON f.finding_id = rs.finding_id
+                ORDER BY f.created_at DESC
+            """)
+            findings = [dict(row) for row in cursor.fetchall()]
+
+            cursor.execute("SELECT COUNT(*) AS count FROM assets")
+            total_assets = (cursor.fetchone() or {}).get('count', 0)
+
+            cursor.execute("SELECT COUNT(*) AS count FROM asset_controls WHERE patching_status = 'patched'")
+            patched_controls = (cursor.fetchone() or {}).get('count', 0)
+
+            cursor.execute("SELECT COUNT(*) AS count FROM asset_controls WHERE mfa_enabled = TRUE AND edr_enabled = TRUE")
+            mfa_edr_controls = (cursor.fetchone() or {}).get('count', 0)
+
+        total_findings = len(findings)
+        critical_findings = sum(1 for f in findings if f.get('severity') == 'critical')
+        unpatched_findings = sum(1 for f in findings if f.get('patching_status') == 'unpatched')
+        exploitable_findings = sum(1 for f in findings if f.get('exploit_available') or f.get('cisa_kev'))
+
+        patch_compliance = round((patched_controls / total_assets * 100)) if total_assets > 0 else 0
+        mfa_edr_coverage = round((mfa_edr_controls / total_assets * 100)) if total_assets > 0 else 0
+
+        summary = {
+            "total_findings": total_findings,
+            "critical_findings": critical_findings,
+            "unpatched_findings": unpatched_findings,
+            "exploitable_findings": exploitable_findings,
+            "patch_compliance_percent": patch_compliance,
+            "mfa_edr_coverage_percent": mfa_edr_coverage
+        }
+
+        return {"summary": summary, "findings": findings}
