@@ -154,6 +154,21 @@ def run_threat_intel_enricher():
         return {"source": "threat_intel", "error": str(e)}
 
 
+def run_compliance_mapping():
+    """Run the live-findings compliance mapper (reads DB, writes framework_tags)."""
+    try:
+        logger.info("=" * 60)
+        logger.info("🛡️ Running Compliance Mapper...")
+        from backend.compliance_mapper import ComplianceMapper
+        mapper = ComplianceMapper()
+        stats = mapper.run()
+        logger.info(f"✅ Compliance: {stats['mapped']} findings mapped")
+        return stats
+    except Exception as e:
+        logger.error(f"❌ Compliance failed: {e}")
+        return {"source": "compliance", "error": str(e)}
+
+
 # ============================================================
 # UNIFIED OUTPUT GENERATOR
 # ============================================================
@@ -176,6 +191,7 @@ def fetch_unified_findings():
             cisa_kev,
             mitre_technique,
             raw_data,
+            framework_tags,
             created_at
         FROM findings
         ORDER BY 
@@ -213,10 +229,12 @@ def fetch_unified_findings():
             # MITRE
             "mitre_technique": f['mitre_technique'],
             
+            # COMPLIANCE
+            "framework_tags": list(f['framework_tags']) if f.get('framework_tags') else [],
+            
             # METADATA
             "timestamp": f['created_at'].isoformat() if f['created_at'] else None,
             "detail": parse_raw_data(f['raw_data']),
-            "framework_tags": []
         }
         unified.append(finding)
     
@@ -289,7 +307,7 @@ def main(target_url=None):
     results['nuclei'] = run_nuclei(target=target_url or 'https://httpbin.org')
     
     # ============================================================
-    # 2. TEAMMATES' TOOLS (Uncomment if accessible)
+    # 2. TEAMMATES' TOOLS
     # ============================================================
     results['wazuh'] = run_wazuh()
     results['prowler'] = run_prowler()
@@ -299,6 +317,11 @@ def main(target_url=None):
     # 3. ENRICHMENT
     # ============================================================
     results['threat_intel'] = run_threat_intel_enricher()
+    
+    # ============================================================
+    # 4. COMPLIANCE MAPPING (reads DB, writes framework_tags)
+    # ============================================================
+    results['compliance'] = run_compliance_mapping()
     
     # ============================================================
     # SUMMARY
