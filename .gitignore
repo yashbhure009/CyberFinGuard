@@ -22,3 +22,6 @@ data/*.json
 
 # Logs
 *.log
+# macOS metadata
+.DS_Store
+**/.DS_Store
