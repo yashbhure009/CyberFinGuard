@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE nmaprun>
 <?xml-stylesheet href="file:///C:/Program Files (x86)/Nmap/nmap.xsl" type="text/xsl"?>
-<!-- Nmap 7.991 scan initiated Wed Sep 16 11:05:35 2026 as: &quot;C:\\Program Files (x86)\\Nmap\\nmap.exe&quot; -F -sV -T4 -oX nmap_scanme_nmap_org.xml scanme.nmap.org -->
-<nmaprun scanner="nmap" args="&quot;C:\\Program Files (x86)\\Nmap\\nmap.exe&quot; -F -sV -T4 -oX nmap_scanme_nmap_org.xml scanme.nmap.org" start="1789536935" startstr="Wed Sep 16 11:05:35 2026" version="7.991" xmloutputversion="1.05">
+<!-- Nmap 7.991 scan initiated Wed Sep 16 22:48:06 2026 as: &quot;C:\\Program Files (x86)\\Nmap\\nmap.exe&quot; -F -sV -T4 -oX nmap_scanme_nmap_org.xml scanme.nmap.org -->
+<nmaprun scanner="nmap" args="&quot;C:\\Program Files (x86)\\Nmap\\nmap.exe&quot; -F -sV -T4 -oX nmap_scanme_nmap_org.xml scanme.nmap.org" start="1789579086" startstr="Wed Sep 16 22:48:06 2026" version="7.991" xmloutputversion="1.05">
 <scaninfo type="connect" protocol="tcp" numservices="100" services="7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6646,7070,8000,8008-8009,8080-8081,8443,8888,9100,9999-10000,32768,49152-49157"/>
 <verbose level="0"/>
 <debugging level="0"/>
@@ -12,15 +12,16 @@
 <hostname name="scanme.nmap.org" type="user"/>
 </hostnames>
 </hosthint>
-<host starttime="1789536935" endtime="1789536948"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<host starttime="1789579087" endtime="1789579100"><status state="up" reason="conn-refused" reason_ttl="0"/>
 <address addr="45.33.32.156" addrtype="ipv4"/>
 <hostnames>
 <hostname name="scanme.nmap.org" type="user"/>
 <hostname name="scanme.nmap.org" type="PTR"/>
 </hostnames>
-<ports><extraports state="closed" count="94">
-<extrareasons reason="conn-refused" count="94" proto="tcp" ports="7,9,13,21,23,26,37,53,79,81,88,106,110-111,113,119,143-144,179,199,389,427,443-444,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6646,7070,8000,8008-8009,8080-8081,8443,8888,9100,9999-10000,32768,49152-49157"/>
+<ports><extraports state="closed" count="93">
+<extrareasons reason="conn-refused" count="93" proto="tcp" ports="7,9,13,23,26,37,53,79,81,88,106,110-111,113,119,143-144,179,199,389,427,443-444,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6646,7070,8000,8008-8009,8080-8081,8443,8888,9100,9999-10000,32768,49152-49157"/>
 </extraports>
+<port protocol="tcp" portid="21"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="tcpwrapped" method="probed" conf="8"/></port>
 <port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="ssh" product="OpenSSH" version="6.6.1p1 Ubuntu 2ubuntu2.13" extrainfo="Ubuntu Linux; protocol 2.0" ostype="Linux" method="probed" conf="10"><cpe>cpe:/a:openbsd:openssh:6.6.1p1</cpe><cpe>cpe:/o:linux:linux_kernel</cpe></service></port>
 <port protocol="tcp" portid="25"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="smtp" method="table" conf="3"/></port>
 <port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Apache httpd" version="2.4.7" extrainfo="(Ubuntu)" method="probed" conf="10"><cpe>cpe:/a:apache:http_server:2.4.7</cpe></service></port>
@@ -28,8 +29,8 @@
 <port protocol="tcp" portid="139"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="netbios-ssn" method="table" conf="3"/></port>
 <port protocol="tcp" portid="445"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="microsoft-ds" method="table" conf="3"/></port>
 </ports>
-<times srtt="275864" rttvar="7902" to="307472"/>
+<times srtt="293321" rttvar="12868" to="344793"/>
 </host>
-<runstats><finished time="1789536948" timestr="Wed Sep 16 11:05:48 2026" summary="Nmap done at Wed Sep 16 11:05:48 2026; 1 IP address (1 host up) scanned in 13.20 seconds" elapsed="13.20" exit="success"/><hosts up="1" down="0" total="1"/>
+<runstats><finished time="1789579100" timestr="Wed Sep 16 22:48:20 2026" summary="Nmap done at Wed Sep 16 22:48:20 2026; 1 IP address (1 host up) scanned in 13.74 seconds" elapsed="13.74" exit="success"/><hosts up="1" down="0" total="1"/>
 </runstats>
 </nmaprun>

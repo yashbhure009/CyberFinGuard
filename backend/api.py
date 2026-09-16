@@ -1,247 +1,105 @@
-"""
-CyberFinGuard — FastAPI Backend
-Frontend se input lene ke liye
-"""
+from flask import Flask, request, jsonify
+from importlib import import_module
 
-import os
-import sys
+try:
+    CORS = import_module('flask_cors').CORS
+except ImportError:
+    def CORS(_app):
+        """No-op fallback when flask-cors is not installed."""
+        return None
+import subprocess
 import json
-import logging
+import os
 from datetime import datetime
-from typing import Optional
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from dotenv import load_dotenv
+app = Flask(__name__)
+CORS(app)
 
-# Path setup
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-load_dotenv()
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-app = FastAPI(
-    title="CyberFinGuard API",
-    description="AI-Powered Cyber Risk Quantification Platform",
-    version="1.0.0"
-)
-
-# CORS — frontend ko access dene ke liye
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# ============================================================
-# MODELS
-# ============================================================
-
-class ScanRequest(BaseModel):
-    target: str  # URL ya IP address
-    scan_type: str = "quick"  # quick, full
-    sources: list = ["zap", "nmap", "nuclei"]  # kaunse tools chalane hain
-
-
-class ScanResponse(BaseModel):
-    status: str
-    target: str
-    findings_count: int
-    findings: list
-
-
-# ============================================================
-# ENDPOINTS
-# ============================================================
-
-@app.get("/")
-def root():
-    return {
-        "status": "ok",
-        "service": "CyberFinGuard API",
-        "version": "1.0.0"
+# In-memory store (use DB for production)
+scan_config = {
+    "target_url": None,
+    "cloud": {"provider": None, "account_id": None, "role_arn": None},
+    "identity": {"url": None, "realm": None, "client_id": None, "client_secret": None},
+    "business": {
+        "asset_name": None, "asset_type": None, "business_unit": None,
+        "asset_owner": None, "business_value": None,
+        "downtime_cost": None, "recovery_cost": None
     }
+}
 
 
-@app.get("/health")
-def health():
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
+@app.route('/api/config/website', methods=['POST'])
+def set_website():
+    data = request.json
+    scan_config['target_url'] = data.get('target_url')
+    return jsonify({"status": "ok", "target_url": scan_config['target_url']})
+
+
+@app.route('/api/config/cloud', methods=['POST'])
+def set_cloud():
+    data = request.json
+    scan_config['cloud'] = {
+        "provider": data.get('provider'),
+        "account_id": data.get('account_id'),
+        "role_arn": data.get('role_arn')
     }
+    return jsonify({"status": "ok", "cloud": scan_config['cloud']})
 
 
-@app.post("/scan")
-def start_scan(request: ScanRequest):
-    """
-    Frontend se scan trigger karo
-    Input: {target: "https://example.com"}
-    """
-    logger.info(f"🚀 Scan request: {request.target} | Type: {request.scan_type}")
-    
-    # Validate target
-    if not request.target:
-        raise HTTPException(status_code=400, detail="Target is required")
-    
-    target = request.target.strip()
-    
-    results = {}
-    
-    # 1. ZAP Scan
-    if "zap" in request.sources:
-        try:
-            logger.info("🕷️ Running ZAP...")
-            from ingestion.zap_ingestor import ZAPIngestor
-            zap = ZAPIngestor()
-            results["zap"] = zap.run(target_url=target)
-        except Exception as e:
-            logger.error(f"❌ ZAP failed: {e}")
-            results["zap"] = {"error": str(e)}
-    
-    # 2. Nmap Scan
-    if "nmap" in request.sources:
-        try:
-            logger.info("🔍 Running Nmap...")
-            from ingestion.nmap_ingestor import NmapIngestor
-            nmap = NmapIngestor()
-            # IP nikalo URL se
-            nmap_target = target.replace("https://", "").replace("http://", "").split("/")[0]
-            results["nmap"] = nmap.run(target=nmap_target)
-        except Exception as e:
-            logger.error(f"❌ Nmap failed: {e}")
-            results["nmap"] = {"error": str(e)}
-    
-    # 3. Nuclei Scan
-    if "nuclei" in request.sources:
-        try:
-            logger.info("🎯 Running Nuclei...")
-            from ingestion.nuclei_ingestor import NucleiIngestor
-            nuclei = NucleiIngestor()
-            results["nuclei"] = nuclei.run(target=target)
-        except Exception as e:
-            logger.error(f"❌ Nuclei failed: {e}")
-            results["nuclei"] = {"error": str(e)}
-    
-    # 4. Threat Intel Enrichment
+@app.route('/api/config/identity', methods=['POST'])
+def set_identity():
+    data = request.json
+    scan_config['identity'] = {
+        "url": data.get('keycloak_url'),
+        "realm": data.get('realm'),
+        "client_id": data.get('client_id'),
+        "client_secret": data.get('client_secret')
+    }
+    return jsonify({"status": "ok", "identity": scan_config['identity']})
+
+
+@app.route('/api/config/business', methods=['POST'])
+def set_business():
+    data = request.json
+    scan_config['business'] = {
+        "asset_name": data.get('asset_name'),
+        "asset_type": data.get('asset_type'),
+        "business_unit": data.get('business_unit'),
+        "asset_owner": data.get('asset_owner'),
+        "business_value": data.get('business_value'),
+        "downtime_cost": data.get('downtime_cost'),
+        "recovery_cost": data.get('recovery_cost')
+    }
+    return jsonify({"status": "ok", "business": scan_config['business']})
+
+
+@app.route('/api/scan/run', methods=['POST'])
+def run_scan():
+    """Run full pipeline with user-provided config."""
+    target = scan_config.get('target_url')
+    if not target:
+        return jsonify({"error": "Target URL not set"}), 400
+
+    # Save config to file so pipeline can read it
+    config_file = os.path.join(os.path.dirname(__file__), '..', 'scan_config.json')
+    with open(config_file, 'w') as f:
+        json.dump(scan_config, f, indent=2)
+
+    # Run pipeline
     try:
-        logger.info("🛡️ Running Threat Intel...")
-        from Enrichment.threat_intel import ThreatIntelEnricher
-        enricher = ThreatIntelEnricher()
-        results["threat_intel"] = enricher.enrich_database_findings()
+        result = subprocess.run(
+            ['python', 'main.py', target],
+            capture_output=True, text=True, cwd=os.path.dirname(os.path.dirname(__file__))
+        )
+        return jsonify({
+            "status": "ok",
+            "stdout": result.stdout[-2000:],  # last 2000 chars
+            "stderr": result.stderr[-1000:],
+            "config": scan_config
+        })
     except Exception as e:
-        logger.error(f"❌ Threat Intel failed: {e}")
-        results["threat_intel"] = {"error": str(e)}
-    
-    # Get findings count
-    from database import db
-    findings = db.execute_query("SELECT * FROM findings ORDER BY created_at DESC LIMIT 50")
-    
-    return {
-        "status": "completed",
-        "target": target,
-        "findings_count": len(findings),
-        "results": results,
-        "findings": findings
-    }
+        return jsonify({"error": str(e)}), 500
 
 
-@app.get("/findings")
-def get_findings(source: Optional[str] = None, limit: int = 100):
-    """Sab findings laao"""
-    from database import db
-    
-    query = "SELECT * FROM findings"
-    params = []
-    
-    if source:
-        query += " WHERE source = %s"
-        params.append(source)
-    
-    query += " ORDER BY created_at DESC LIMIT %s"
-    params.append(limit)
-    
-    findings = db.execute_query(query, tuple(params))
-    return {
-        "count": len(findings),
-        "findings": findings
-    }
-
-
-@app.get("/assets")
-def get_assets():
-    """Sab assets laao"""
-    from database import db
-    assets = db.execute_query("SELECT * FROM assets ORDER BY asset_name")
-    return {
-        "count": len(assets),
-        "assets": assets
-    }
-
-
-@app.get("/risk-summary")
-def get_risk_summary():
-    """Risk summary — frontend dashboard ke liye"""
-    from database import db
-    
-    findings = db.execute_query("SELECT * FROM findings")
-    assets = db.execute_query("SELECT * FROM assets")
-    
-    # Total risk calculate karo
-    total_risk = 0
-    for finding in findings:
-        cvss = finding.get('cvss_score') or 5.0
-        asset_id = finding.get('asset_id')
-        asset_value = 10000000  # Default ₹1 Cr
-        
-        # Find asset value
-        for asset in assets:
-            if asset['asset_id'] == asset_id:
-                asset_value = float(asset.get('asset_value') or 10000000)
-                break
-        
-        sle = asset_value * (float(cvss) / 10)
-        aro = 0.5 if float(cvss) > 7 else 0.2
-        total_risk += sle * aro
-    
-    # Findings by severity
-    severity_counts = {}
-    for finding in findings:
-        sev = finding.get('severity', 'info')
-        severity_counts[sev] = severity_counts.get(sev, 0) + 1
-    
-    # Findings by source
-    source_counts = {}
-    for finding in findings:
-        src = finding.get('source', 'unknown')
-        source_counts[src] = source_counts.get(src, 0) + 1
-    
-    return {
-        "total_findings": len(findings),
-        "total_assets": len(assets),
-        "total_risk_inr": total_risk,
-        "severity_distribution": severity_counts,
-        "source_distribution": source_counts,
-        "timestamp": datetime.now().isoformat()
-    }
-
-
-@app.get("/stats")
-def get_stats():
-    """Quick stats"""
-    from database import db
-    findings = db.execute_query("SELECT COUNT(*) as count FROM findings")
-    assets = db.execute_query("SELECT COUNT(*) as count FROM assets")
-    
-    return {
-        "total_findings": findings[0]['count'] if findings else 0,
-        "total_assets": assets[0]['count'] if assets else 0
-    }
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

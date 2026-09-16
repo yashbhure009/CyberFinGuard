@@ -1,0 +1,23 @@
+{
+  "target_url": "https://desktop-72ti05t.tailc1051b.ts.net/",
+  "cloud": {
+    "provider": "AWS",
+    "account_id": "",
+    "role_arn": ""
+  },
+  "identity": {
+    "url": "http://127.0.0.1:8090",
+    "realm": "master",
+    "client_id": "",
+    "client_secret": ""
+  },
+  "business": {
+    "asset_name": "Payment Gateway",
+    "asset_type": "Application",
+    "business_unit": "Digital Banking",
+    "asset_owner": "Alex Morgan",
+    "business_value": "50000000",
+    "downtime_cost": "250000",
+    "recovery_cost": "5000000"
+  }
+}
